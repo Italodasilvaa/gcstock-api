@@ -1,0 +1,16 @@
+**/bin/
+**/obj/
+**/out/
+**/.vs/
+**/.vscode/
+**/.idea/
+**/[Tt]est[Rr]esult*/
+**/*.trx
+
+.git/
+.gitignore
+.dockerignore
+README.md
+PROMPT-BASE-PROJETO.md
+azure-pipelines.yml
+deploy/stacks/

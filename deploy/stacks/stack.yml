@@ -1,0 +1,50 @@
+version: "3.8"
+
+services:
+  api:
+    image: __REGISTRY_URL__/__API_IMAGE_NAME__:__DOCKER_TAG__
+    environment:
+      ASPNETCORE_ENVIRONMENT: __ENVIRONMENT__
+    networks:
+      - girus-network
+      - traefik-public
+    deploy:
+      labels:
+        - "traefik.enable=true"
+        - "traefik.docker.network=traefik-public"
+        - "traefik.http.routers.__SERVICE_NAME__-api.rule=Host(`__HOST_DOMAIN__`)"
+        - "traefik.http.routers.__SERVICE_NAME__-api.entrypoints=websecure"
+        - "traefik.http.routers.__SERVICE_NAME__-api.tls=true"
+        - "traefik.http.services.__SERVICE_NAME__-api.loadbalancer.server.port=8080"
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+      update_config:
+        order: start-first
+        failure_action: rollback
+      healthcheck:
+        test: ["CMD", "wget", "-qO-", "http://localhost:8080/health/live"]
+        interval: 30s
+        timeout: 5s
+        retries: 3
+        start_period: 20s
+
+  worker:
+    image: __REGISTRY_URL__/__WORKER_IMAGE_NAME__:__DOCKER_TAG__
+    environment:
+      ASPNETCORE_ENVIRONMENT: __ENVIRONMENT__
+    networks:
+      - girus-network
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+      update_config:
+        order: start-first
+        failure_action: rollback
+
+networks:
+  girus-network:
+    driver: overlay
+  traefik-public:
+    external: true

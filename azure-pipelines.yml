@@ -1,0 +1,124 @@
+trigger:
+  branches:
+    include:
+      - production
+      - staging
+
+variables:
+  RegistryUrl: "cr.valee.com.br"
+  ApiImageName: "girus-api"
+  WorkerImageName: "girus-worker"
+  DockerTag: "$(Build.BuildId)"
+  ${{ if eq(variables['Build.SourceBranchName'], 'production') }}:
+    Environment: "production"
+    StackName: "girus-prd"
+    HostDomain: "api-girus.valee.com.br"
+  ${{ if eq(variables['Build.SourceBranchName'], 'staging') }}:
+    Environment: "staging"
+    StackName: "girus-stg"
+    HostDomain: "api-girus-hml.valee.com.br"
+
+pool:
+  vmImage: "ubuntu-latest"
+
+stages:
+  - stage: Build
+    displayName: "Build e Push das imagens"
+    jobs:
+      - job: BuildAndPush
+        displayName: "dotnet build/test + docker build/push"
+        steps:
+          - task: UseDotNet@2
+            displayName: "Instalar .NET 10 SDK"
+            inputs:
+              packageType: sdk
+              version: "10.0.x"
+
+          - script: dotnet restore Girus.slnx
+            displayName: "dotnet restore"
+
+          - script: dotnet build Girus.slnx --configuration Release --no-restore
+            displayName: "dotnet build"
+
+          - script: dotnet test Girus.slnx --configuration Release --no-build --logger trx
+            displayName: "dotnet test"
+
+          - task: PublishTestResults@2
+            displayName: "Publicar resultados dos testes"
+            condition: succeededOrFailed()
+            inputs:
+              testResultsFormat: "VSTest"
+              testResultsFiles: "**/*.trx"
+
+          - task: Docker@2
+            displayName: "Build e push da API"
+            inputs:
+              containerRegistry: "$(RegistryUrl)"
+              repository: "$(ApiImageName)"
+              command: "buildAndPush"
+              Dockerfile: "deploy/api.Dockerfile"
+              buildContext: "."
+              tags: |
+                $(DockerTag)
+                latest-$(Environment)
+
+          - task: Docker@2
+            displayName: "Build e push do Worker"
+            inputs:
+              containerRegistry: "$(RegistryUrl)"
+              repository: "$(WorkerImageName)"
+              command: "buildAndPush"
+              Dockerfile: "deploy/worker.Dockerfile"
+              buildContext: "."
+              tags: |
+                $(DockerTag)
+                latest-$(Environment)
+
+  - stage: Deploy
+    displayName: "Deploy no Swarm ($(Environment))"
+    dependsOn: Build
+    jobs:
+      - deployment: DeployStack
+        displayName: "Deploy da stack"
+        environment: "$(Environment)"
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - task: Bash@3
+                  displayName: "Gerar stack.yml com placeholders substituídos"
+                  inputs:
+                    targetType: "inline"
+                    script: |
+                      set -e
+                      sed \
+                        -e "s|__REGISTRY_URL__|$(RegistryUrl)|g" \
+                        -e "s|__API_IMAGE_NAME__|$(ApiImageName)|g" \
+                        -e "s|__WORKER_IMAGE_NAME__|$(WorkerImageName)|g" \
+                        -e "s|__DOCKER_TAG__|$(DockerTag)|g" \
+                        -e "s|__ENVIRONMENT__|$(Environment)|g" \
+                        -e "s|__SERVICE_NAME__|$(StackName)|g" \
+                        -e "s|__HOST_DOMAIN__|$(HostDomain)|g" \
+                        deploy/stacks/stack.yml > $(Build.ArtifactStagingDirectory)/stack.$(Environment).yml
+
+                - task: PublishBuildArtifacts@1
+                  displayName: "Publicar stack.yml gerado"
+                  inputs:
+                    PathtoPublish: "$(Build.ArtifactStagingDirectory)/stack.$(Environment).yml"
+                    ArtifactName: "stack-$(Environment)"
+
+                - task: CopyFilesOverSSH@0
+                  displayName: "Copiar stack.yml para o host do Swarm"
+                  inputs:
+                    sshEndpoint: "swarm-$(Environment)"
+                    sourceFolder: "$(Build.ArtifactStagingDirectory)"
+                    contents: "stack.$(Environment).yml"
+                    targetFolder: "/tmp/girus-deploy"
+
+                - task: SSH@0
+                  displayName: "docker stack deploy"
+                  inputs:
+                    sshEndpoint: "swarm-$(Environment)"
+                    runOptions: "commands"
+                    commands: |
+                      docker stack deploy --with-registry-auth -c /tmp/girus-deploy/stack.$(Environment).yml $(StackName)
