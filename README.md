@@ -59,6 +59,79 @@ azure-pipelines.yml
   }
   ```
 
+## Domínio de negócio (Girus ERP)
+
+A API implementa, com banco real (SQL Server via EF Core) e autenticação JWT real (bcrypt + JWT), o mesmo contrato
+que o front-end `girus-ui` hoje simula localmente no `MockDataService` (multi-empresa, produtos, kits, estoque,
+compras, financeiro, PDV, clientes, funcionários e auditoria). Ver `src/Girus.Api/Endpoints/*.cs` para o mapeamento
+completo das rotas — resumo:
+
+| Área | Rotas | Autenticação |
+| --- | --- | --- |
+| Auth | `POST /api/v1/auth/register-company`, `POST /api/v1/auth/login`, `POST /api/v1/auth/logout`, `GET /api/v1/auth/me`, `GET /api/v1/auth/companies`, `GET /api/v1/auth/companies/{id}/quick-login-email` | login/register/companies são públicas; `me`/`logout` exigem token |
+| Tenants | `GET /api/v1/tenants/my-companies`, `POST /api/v1/tenants/switch`, `GET /api/v1/tenants/filiais` | token (troca de empresa só para o dono) |
+| Funcionários | `GET/POST /api/v1/funcionarios`, `PUT/DELETE /api/v1/funcionarios/{id}`, `POST /api/v1/funcionarios/{id}/transferir` | token |
+| Produtos | `GET/POST /api/v1/produtos`, `PUT/DELETE /api/v1/produtos/{id}` | token |
+| Kits | `GET/POST /api/v1/kits-churrasco`, `PUT /api/v1/kits-churrasco/{id}` | token |
+| Estoque | `GET /api/v1/estoque/lotes`, `GET /api/v1/estoque/movimentacoes` | token |
+| Compras | `GET /api/v1/compras`, `POST /api/v1/compras/entrada` | token |
+| Financeiro | `GET/POST /api/v1/financeiro/contas-a-pagar` (+ `/{id}/baixar`), `GET/POST /api/v1/financeiro/clientes-a-receber` (+ `/{id}/liquidar`), `GET /api/v1/financeiro/liquidacoes-cartao` (+ `/{id}/antecipar`), `GET /api/v1/financeiro/vendas` | token |
+| Configurações | `GET/PATCH /api/v1/configuracoes/taxas/{id}`, `GET/PUT /api/v1/configuracoes/alertas-sanitarios` | token |
+| PDV | `POST /api/v1/pdv/finalizar-venda` | token |
+| Clientes | `GET/POST /api/v1/clientes`, `PUT /api/v1/clientes/{id}` | token |
+| Auditoria | `GET /api/v1/auditoria` | token |
+
+Todos os dados são isolados por empresa (`companyId` extraído das claims do JWT) — o mesmo modelo multi-tenant do mock
+(um Administrator pode ter N empresas; um Employee pertence a exatamente uma).
+
+### Autenticação (JWT + bcrypt)
+
+- Senhas de `Administrator` e `Employee` são armazenadas com hash bcrypt (`BCrypt.Net-Next`).
+- Login devolve um JWT (HMAC-SHA256) com claims `sub`, `name`, `email`, `role`, `company_id` e, quando aplicável,
+  `administrator_id` (dono) ou `employee_id` (funcionário). Validade padrão: 480 minutos (`Jwt:ExpiresMinutes`).
+- Envie o token em `Authorization: Bearer <token>` nas rotas protegidas.
+- **`Jwt:SecretKey`**: em `appsettings.json` há um valor de desenvolvimento gerado apenas para rodar localmente.
+  Em Staging/Production o valor está vazio de propósito e a API **recusa iniciar** se a variável de ambiente
+  `Jwt__SecretKey` (≥ 32 caracteres) não estiver definida.
+- `GET /api/v1/auth/companies/{id}/quick-login-email` é uma conveniência de demonstração (mesmo comportamento do
+  "acesso rápido" da tela de login do mock) que expõe o e-mail do dono de uma empresa sem autenticação — **remova
+  ou proteja este endpoint antes de qualquer uso real em produção**.
+
+### Banco de dados e seed
+
+- O `ConnectionStrings:DefaultConnection` padrão foi ajustado para apontar para um banco dedicado (`GirusDb`) no
+  mesmo servidor de dev/homologação já configurado no projeto, em vez de `dbValee-Refactor` — evitando colidir com
+  as tabelas de outro sistema. Confirme se este é o banco/servidor certo antes de rodar as migrations.
+- Em ambiente **Development**, a API aplica as migrations pendentes e popula o banco automaticamente ao iniciar
+  (`DbSeeder`), recriando os mesmos donos/empresas de demonstração que existiam no mock (para não perder o fluxo de
+  login durante a migração):
+
+  | E-mail | Senha | Empresa |
+  | --- | --- | --- |
+  | `italodasilvaa@gmail.com` | `123` | M&C Frig Carnes Nobres (+ M&C Frig Litoral) |
+  | `contato@angusprime.com.br` | `123` | Angus Prime Steakhouse & Boutique |
+  | `diretoria@braseirodosul.com.br` | `123` | Frigorífico Braseiro do Sul |
+
+- Em **Staging/Production**, rode as migrations manualmente (ou via pipeline) antes do primeiro deploy:
+
+  ```bash
+  dotnet ef database update --project src/Girus.Infra --startup-project src/Girus.Api
+  ```
+
+### Como conectar o front-end (girus-ui)
+
+O `girus-ui` hoje fala inteiramente com `MockDataService` (dados no `localStorage`). Para plugar nesta API:
+
+1. Trocar cada chamada `mockData.xxx(...)` por uma chamada HTTP equivalente (mesmos nomes de campos — os DTOs em
+   `Girus.Application/*/*.cs` foram desenhados espelhando `src/app/core/models/models.ts`).
+2. Guardar o `token` retornado por `/auth/login` (ou `/auth/register-company`) e anexá-lo em todas as chamadas via
+   um `HttpInterceptor` (`Authorization: Bearer <token>`).
+3. Substituir `getCurrentSession()` por uma chamada a `GET /api/v1/auth/me` na inicialização do app, para validar o
+   token salvo e restaurar a sessão.
+4. Ajustar `environment.ts`/`environment.development.ts` com a URL base da API (ex.: `http://localhost:5xxx`).
+
+Nenhuma alteração no `girus-ui` foi feita nesta tarefa — este passo fica para quando a integração for ligada de fato.
+
 ## Worker
 
 Hosted service (`Girus.Worker.Worker`) que executa um probe periódico no SQL Server (`SELECT 1`), com intervalo configurável via `Worker:DatabaseProbeIntervalSeconds` (padrão: 30 segundos). Sucesso e falha são registrados via `ILogger`.
@@ -75,17 +148,23 @@ Hosted service (`Girus.Worker.Worker`) que executa um probe periódico no SQL Se
 `ConnectionStrings:DefaultConnection` já vem com o valor padrão do ambiente de desenvolvimento/homologação:
 
 ```
-Server=db-nprd.valee.com.br;Database=dbValee-Refactor;User Id=sa;Password=SqlAdm2010;TrustServerCertificate=True;
+Server=db-nprd.valee.com.br;Database=GirusDb;User Id=sa;Password=SqlAdm2010;TrustServerCertificate=True;
 ```
+
+A seção `Jwt` (`Issuer`, `Audience`, `SecretKey`, `ExpiresMinutes`) segue o mesmo padrão — ver "Autenticação (JWT +
+bcrypt)" acima para os detalhes de `SecretKey` por ambiente.
 
 ## Build, testes e execução local
 
 ```bash
 dotnet build Girus.slnx
 dotnet test Girus.slnx
-dotnet run --project src/Girus.Api
+dotnet run --project src/Girus.Api    # aplica migrations + seed automaticamente em Development
 dotnet run --project src/Girus.Worker
 ```
+
+Depois de rodando, abra `https://localhost:<porta>/swagger` para testar os endpoints (o Swagger já vem configurado
+com suporte a Bearer token — clique em "Authorize" e cole o token retornado por `/api/v1/auth/login`).
 
 ## Deploy
 
