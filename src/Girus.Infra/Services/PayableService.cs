@@ -35,6 +35,7 @@ public class PayableService(GirusDbContext db, ICurrentUserContext currentUser, 
             PaymentMethod = request.PaymentMethod ?? "Boleto Bancário",
             Origin = request.Origin ?? "Despesa Manual",
             Status = "a_vencer",
+            Category = request.Category ?? "outros",
         };
         db.AccountsPayables.Add(saved);
         await db.SaveChangesAsync(ct);
@@ -53,6 +54,13 @@ public class PayableService(GirusDbContext db, ICurrentUserContext currentUser, 
         item.DueLabel = $"Pago em {today:dd/MM/yyyy}";
         item.ReceiptAttached = true;
 
+        if (!string.IsNullOrEmpty(item.PurchaseEntryId))
+        {
+            var purchase = await db.PurchaseEntries
+                .FirstOrDefaultAsync(p => p.Id == item.PurchaseEntryId && p.CompanyId == currentUser.CompanyId, ct);
+            if (purchase is not null) purchase.PaymentStatus = "pago";
+        }
+
         await db.SaveChangesAsync(ct);
         await audit.RecordAsync("baixou", "Conta a Pagar", $"{item.Supplier} • {item.Description}", null, ct);
         return ToDto(item);
@@ -60,5 +68,5 @@ public class PayableService(GirusDbContext db, ICurrentUserContext currentUser, 
 
     private static AccountsPayableDto ToDto(AccountsPayable p) => new(
         p.Id, p.Supplier, p.Description, p.NfeReference, p.IssueDate, p.DueDate, p.DueLabel, p.Amount,
-        p.PaymentMethod, p.Origin, p.Status, p.PaidDate, p.ReceiptAttached);
+        p.PaymentMethod, p.Origin, p.Status, p.PaidDate, p.ReceiptAttached, p.Category);
 }

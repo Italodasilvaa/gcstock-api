@@ -30,6 +30,18 @@ public class Product
     public bool IsPromo { get; set; }
 }
 
+/// <summary>Categoria de produto da empresa. Product.Category guarda o Name (texto), então renomear aqui propaga para os produtos.</summary>
+public class ProductCategory
+{
+    public string Id { get; set; } = "cat_" + Guid.NewGuid().ToString("N");
+    public string CompanyId { get; set; } = string.Empty;
+    public Company? Company { get; set; }
+
+    public string Name { get; set; } = string.Empty;
+    public string Icon { get; set; } = "category";
+    public int SortOrder { get; set; }
+}
+
 /// <summary>StockStatus: "amplo" | "disponivel" | "alerta".</summary>
 public class Kit
 {

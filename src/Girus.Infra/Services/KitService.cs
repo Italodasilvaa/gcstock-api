@@ -76,6 +76,16 @@ public class KitService(GirusDbContext db, ICurrentUserContext currentUser, IAud
         return ToDto(saved);
     }
 
+    public async Task DeleteAsync(string id, CancellationToken ct)
+    {
+        var target = await db.Kits.FirstOrDefaultAsync(k => k.Id == id && k.CompanyId == currentUser.CompanyId, ct);
+        if (target is null) return;
+
+        db.Kits.Remove(target);
+        await db.SaveChangesAsync(ct);
+        await audit.RecordAsync("excluiu", "Kit de Churrasco", target.Name, null, ct);
+    }
+
     private static KitComponent ToEntity(KitComponentDto c) => new()
     {
         ProductId = c.ProductId,

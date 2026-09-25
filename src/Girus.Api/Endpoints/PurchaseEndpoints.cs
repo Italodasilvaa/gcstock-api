@@ -13,5 +13,19 @@ public static class PurchaseEndpoints
 
         group.MapPost("/entrada", async (SavePurchaseRequest request, IPurchaseService service, CancellationToken ct) =>
             Results.Created("/api/v1/compras", await service.SaveAsync(request, ct)));
+
+        group.MapPut("/{id}", async (string id, SavePurchaseRequest request, IPurchaseService service, CancellationToken ct) =>
+        {
+            try
+            {
+                var updated = await service.UpdateAsync(id, request, ct);
+                return updated is not null ? Results.Ok(updated) : Results.NotFound();
+            }
+            catch (InvalidOperationException ex)
+            {
+                // Compra já paga: não pode mais ser alterada.
+                return Results.Conflict(new { message = ex.Message });
+            }
+        });
     }
 }

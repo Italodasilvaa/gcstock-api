@@ -138,6 +138,23 @@ public class AuthService(
         return new AuthSessionDto(user, companyDto, string.Empty, DateTime.UtcNow);
     }
 
+    public async Task<AuthSessionDto?> RenewTokenAsync(CancellationToken ct)
+    {
+        if (!currentUser.IsAuthenticated) return null;
+
+        var company = await db.Companies.FirstOrDefaultAsync(c => c.Id == currentUser.CompanyId, ct);
+        if (company is null) return null;
+
+        var (token, _) = jwtTokenService.IssueToken(new JwtIssueRequest(
+            currentUser.UserId, currentUser.UserName, currentUser.UserEmail, currentUser.Role, currentUser.CompanyId,
+            AdministratorId: currentUser.AdministratorId,
+            EmployeeId: currentUser.EmployeeId));
+
+        var companyDto = await company.ToDtoAsync(db, ct);
+        var userDto = new AuthUserDto(currentUser.UserId, currentUser.UserName, currentUser.UserEmail, currentUser.Role, currentUser.EmployeeId);
+        return new AuthSessionDto(userDto, companyDto, token, DateTime.UtcNow);
+    }
+
     public async Task<List<CompanySummaryDto>> ListCompaniesForLoginAsync(CancellationToken ct)
     {
         var companies = await db.Companies.Include(c => c.Owner).OrderByDescending(c => c.CreatedAt).ToListAsync(ct);

@@ -18,6 +18,8 @@ public class StockBatch
     public string FiscalDoc { get; set; } = string.Empty;
     public string Supplier { get; set; } = string.Empty;
     public string Status { get; set; } = "novo";
+    /// <summary>Compra de origem deste lote — permite reverter/refazer o lote quando a compra é editada.</summary>
+    public string? PurchaseEntryId { get; set; }
 }
 
 /// <summary>Type: "entrada" | "baixa_pdv" | "perda_quebra".</summary>
@@ -35,4 +37,6 @@ public class StockMovement
     public string Description { get; set; } = string.Empty;
     public string BadgeLabel { get; set; } = string.Empty;
     public string AuditLink { get; set; } = string.Empty;
+    /// <summary>Compra de origem deste movimento — permite removê-lo quando a compra é editada.</summary>
+    public string? PurchaseEntryId { get; set; }
 }

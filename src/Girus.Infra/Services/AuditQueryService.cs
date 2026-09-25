@@ -13,7 +13,7 @@ public class AuditQueryService(GirusDbContext db, ICurrentUserContext currentUse
             .Where(a => a.CompanyId == currentUser.CompanyId)
             .OrderByDescending(a => a.Timestamp)
             .Select(a => new AuditLogEntryDto(
-                a.Id, a.Timestamp, a.UserId, a.UserName, a.UserRole, a.Action, a.EntityType, a.EntityLabel, a.Details))
+                a.Id, a.Timestamp, a.UserId, a.UserName, a.UserRole, a.CompanyId, a.Action, a.EntityType, a.EntityLabel, a.Details))
             .ToListAsync(ct);
     }
 }

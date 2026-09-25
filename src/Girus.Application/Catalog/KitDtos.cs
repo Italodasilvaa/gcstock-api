@@ -48,4 +48,7 @@ public interface IKitService
 {
     Task<List<KitDto>> GetAllAsync(CancellationToken ct);
     Task<KitDto> SaveAsync(SaveKitRequest request, CancellationToken ct);
+
+    /// <summary>Exclui o kit definitivamente — nunca acontece automaticamente (ex.: ao vender), só por ação explícita do usuário.</summary>
+    Task DeleteAsync(string id, CancellationToken ct);
 }

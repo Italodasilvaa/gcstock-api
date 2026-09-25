@@ -6,6 +6,7 @@ public record AuditLogEntryDto(
     string UserId,
     string UserName,
     string UserRole,
+    string CompanyId,
     string Action,
     string EntityType,
     string EntityLabel,

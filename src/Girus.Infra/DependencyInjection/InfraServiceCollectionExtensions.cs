@@ -27,10 +27,10 @@ public static class InfraServiceCollectionExtensions
 
         services
             .AddHealthChecks()
-            .AddCheck<SqlServerHealthCheck>("database", tags: ["ready"]);
+            .AddCheck<DatabaseHealthCheck>("database", tags: ["ready"]);
 
         services.AddDbContext<GirusDbContext>(options =>
-            options.UseSqlServer(configuration.GetConnectionString("DefaultConnection")));
+            options.UseNpgsql(configuration.GetConnectionString("DefaultConnection")));
 
         services.Configure<JwtSettings>(configuration.GetSection(JwtSettings.SectionName));
 
@@ -47,6 +47,7 @@ public static class InfraServiceCollectionExtensions
         services.AddScoped<IEmployeeService, EmployeeService>();
 
         services.AddScoped<IProductService, ProductService>();
+        services.AddScoped<ICategoryService, CategoryService>();
         services.AddScoped<IKitService, KitService>();
         services.AddScoped<IInventoryService, InventoryService>();
         services.AddScoped<IPurchaseService, PurchaseService>();

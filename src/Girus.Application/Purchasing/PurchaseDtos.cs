@@ -7,9 +7,12 @@ public record PurchaseItemDto(
     string Unit,
     decimal UnitCost,
     decimal Subtotal,
-    DateOnly ExpiryDate,
+    DateOnly? ExpiryDate,
     string LotNumber,
-    bool IsPerishable);
+    bool IsPerishable,
+    string? Id = null,
+    // Id do produto no catálogo — quando informado, a entrada soma automaticamente ao estoque dele.
+    string? ProductId = null);
 
 public record PurchaseEntryDto(
     string Id,
@@ -53,4 +56,10 @@ public interface IPurchaseService
 
     /// <summary>Registra a entrada e cria automaticamente um título em Contas a Pagar (Módulo Compras).</summary>
     Task<PurchaseEntryDto> SaveAsync(SavePurchaseRequest request, CancellationToken ct);
+
+    /// <summary>
+    /// Edita uma entrada existente: reverte o estoque somado pelos itens antigos, aplica os itens novos e
+    /// recalcula a validade mais próxima dos produtos afetados (antigos e novos). Retorna null se não encontrada.
+    /// </summary>
+    Task<PurchaseEntryDto?> UpdateAsync(string id, SavePurchaseRequest request, CancellationToken ct);
 }

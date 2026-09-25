@@ -1,5 +1,5 @@
 using System.Diagnostics;
-using Microsoft.Data.SqlClient;
+using Npgsql;
 using Microsoft.Extensions.Configuration;
 
 namespace Girus.Infra.Database;
@@ -14,7 +14,7 @@ public sealed class SqlProbeService(IConfiguration configuration) : IDatabasePro
         var stopwatch = Stopwatch.StartNew();
         try
         {
-            await using var connection = new SqlConnection(_connectionString);
+            await using var connection = new NpgsqlConnection(_connectionString);
             await connection.OpenAsync(cancellationToken);
 
             await using var command = connection.CreateCommand();

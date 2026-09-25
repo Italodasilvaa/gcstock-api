@@ -7,7 +7,8 @@ public record EmployeeDto(
     string Email,
     string Role,
     bool Active,
-    DateOnly CreatedAt);
+    DateOnly CreatedAt,
+    decimal Salary);
 
 public record SaveEmployeeRequest(
     string? Id,
@@ -15,4 +16,5 @@ public record SaveEmployeeRequest(
     string Email,
     string? Password,
     string? Role,
-    bool? Active);
+    bool? Active,
+    decimal? Salary);

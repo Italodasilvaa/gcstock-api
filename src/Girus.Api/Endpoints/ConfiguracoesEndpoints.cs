@@ -11,6 +11,22 @@ public static class ConfiguracoesEndpoints
         group.MapGet("/taxas", async (IFeeService service, CancellationToken ct) =>
             Results.Ok(await service.GetAllAsync(ct)));
 
+        group.MapPost("/taxas", async (CreateFeeRequest request, IFeeService service, CancellationToken ct) =>
+        {
+            try
+            {
+                var created = await service.CreateAsync(request, ct);
+                return Results.Created($"/api/v1/configuracoes/taxas/{created.Id}", created);
+            }
+            catch (InvalidOperationException ex)
+            {
+                return Results.BadRequest(new { message = ex.Message });
+            }
+        });
+
+        group.MapPut("/taxas/ordem", async (ReorderFeesRequest request, IFeeService service, CancellationToken ct) =>
+            Results.Ok(await service.ReorderAsync(request, ct)));
+
         group.MapPatch("/taxas/{id}", async (string id, SaveFeeRequest request, IFeeService service, CancellationToken ct) =>
             Results.Ok(await service.SaveAsync(request with { Id = id }, ct)));
 

@@ -30,6 +30,7 @@ public class EmployeeService(GirusDbContext db, ICurrentUserContext currentUser,
                 if (!string.IsNullOrWhiteSpace(request.Password)) existing.PasswordHash = passwordHasher.Hash(request.Password);
                 if (request.Role is not null) existing.Role = request.Role;
                 if (request.Active is not null) existing.Active = request.Active.Value;
+                if (request.Salary is not null) existing.Salary = request.Salary.Value;
 
                 await db.SaveChangesAsync(ct);
                 await audit.RecordAsync("editou", "Funcionário", existing.Name, null, ct);
@@ -45,6 +46,7 @@ public class EmployeeService(GirusDbContext db, ICurrentUserContext currentUser,
             PasswordHash = passwordHasher.Hash(string.IsNullOrWhiteSpace(request.Password) ? "123456" : request.Password),
             Role = string.IsNullOrWhiteSpace(request.Role) ? "operador" : request.Role,
             Active = request.Active ?? true,
+            Salary = request.Salary ?? 0,
         };
         db.Employees.Add(employee);
         await db.SaveChangesAsync(ct);
@@ -82,5 +84,5 @@ public class EmployeeService(GirusDbContext db, ICurrentUserContext currentUser,
     }
 
     private static EmployeeDto ToDto(Employee e) => new(
-        e.Id, e.CompanyId, e.Name, e.Email, e.Role, e.Active, DateOnly.FromDateTime(e.CreatedAt));
+        e.Id, e.CompanyId, e.Name, e.Email, e.Role, e.Active, DateOnly.FromDateTime(e.CreatedAt), e.Salary);
 }

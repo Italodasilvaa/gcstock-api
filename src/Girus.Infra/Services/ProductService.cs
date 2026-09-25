@@ -7,7 +7,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Girus.Infra.Services;
 
-public class ProductService(GirusDbContext db, ICurrentUserContext currentUser, IAuditRecorder audit) : IProductService
+public class ProductService(GirusDbContext db, ICurrentUserContext currentUser, IAuditRecorder audit, ICategoryService categories) : IProductService
 {
     public async Task<List<ProductDto>> GetAllAsync(CancellationToken ct)
     {
@@ -45,6 +45,7 @@ public class ProductService(GirusDbContext db, ICurrentUserContext currentUser, 
                 if (request.IsPromo is not null) existing.IsPromo = request.IsPromo.Value;
 
                 await db.SaveChangesAsync(ct);
+                await categories.EnsureExistsAsync(existing.Category, ct);
                 await audit.RecordAsync("editou", "Produto", existing.Name, null, ct);
                 return ToDto(existing);
             }
@@ -79,6 +80,7 @@ public class ProductService(GirusDbContext db, ICurrentUserContext currentUser, 
         };
         db.Products.Add(saved);
         await db.SaveChangesAsync(ct);
+        await categories.EnsureExistsAsync(saved.Category, ct);
         await audit.RecordAsync("criou", "Produto", saved.Name, null, ct);
         return ToDto(saved);
     }

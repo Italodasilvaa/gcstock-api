@@ -19,6 +19,12 @@ public class AccountsPayable
     public string Status { get; set; } = "a_vencer";
     public DateOnly? PaidDate { get; set; }
     public bool ReceiptAttached { get; set; }
+
+    /// <summary>"compras" | "equipamento" | "investimento" | "outros" — usada na Gestão da Empresa e no fechamento mensal.</summary>
+    public string Category { get; set; } = "outros";
+
+    /// <summary>Compra (Módulo Compras) que originou o título; ao dar baixa, a compra também passa a "pago".</summary>
+    public string? PurchaseEntryId { get; set; }
 }
 
 /// <summary>Status: "vencido" | "a_vencer" | "recebido". Type: "b2b" | "adquirente" | "evento".</summary>
@@ -58,6 +64,8 @@ public class PaymentFeeSetting
     public string SettlementTerm { get; set; } = string.Empty;
     public bool Active { get; set; } = true;
     public string Icon { get; set; } = string.Empty;
+    /// <summary>Posição na lista de Configurações e nos cards de pagamento do PDV.</summary>
+    public int SortOrder { get; set; }
 }
 
 /// <summary>Status: "a_liquidar" | "liquidado" | "antecipado".</summary>

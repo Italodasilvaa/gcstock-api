@@ -27,6 +27,12 @@ builder.Services
     .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
     {
+        // Sem isso, o handler remapeia o claim curto "sub" para o URI legado
+        // ClaimTypes.NameIdentifier ao validar o token — e HttpCurrentUserContext.UserId,
+        // que procura por JwtRegisteredClaimNames.Sub ("sub"), nunca encontra o claim e lança
+        // InvalidOperationException. Isso derruba /auth/me (chamado no boot do front-end) e
+        // desloga o usuário mesmo com um token válido.
+        options.MapInboundClaims = false;
         options.TokenValidationParameters = new TokenValidationParameters
         {
             ValidateIssuer = true,
@@ -95,7 +101,14 @@ app.UseSwaggerUI();
 
 app.UseCors(CorsPolicyExtensions.PolicyName);
 
-app.UseHttpsRedirection();
+// Em desenvolvimento local, evita o redirecionamento para a porta HTTPS (launchSettings expõe
+// http+https juntos): o front-end costuma fixar a URL da API em http://localhost:5105, e o
+// redirect para https://localhost:7133 quebra o preflight de CORS quando o certificado dev
+// não está confiado no navegador.
+if (!app.Environment.IsDevelopment())
+{
+    app.UseHttpsRedirection();
+}
 
 app.UseAuthentication();
 app.UseAuthorization();

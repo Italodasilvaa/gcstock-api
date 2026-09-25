@@ -28,6 +28,14 @@ public static class AuthEndpoints
             return session is not null ? Results.Ok(session) : Results.Unauthorized();
         }).RequireAuthorization();
 
+        // Emite um novo token para o usuário autenticado — usado pelo aviso de inatividade do front-end
+        // para manter a sessão viva sem exigir login de novo.
+        group.MapPost("/renew", async (IAuthService service, CancellationToken ct) =>
+        {
+            var session = await service.RenewTokenAsync(ct);
+            return session is not null ? Results.Ok(session) : Results.Unauthorized();
+        }).RequireAuthorization();
+
         // Lista pública (dados não sensíveis) para a tela de login exibir as empresas de demonstração.
         group.MapGet("/companies", async (IAuthService service, CancellationToken ct) =>
             Results.Ok(await service.ListCompaniesForLoginAsync(ct))).AllowAnonymous();

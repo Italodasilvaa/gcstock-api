@@ -33,13 +33,16 @@ public class PurchaseItem
     public string PurchaseEntryId { get; set; } = string.Empty;
     public PurchaseEntry? PurchaseEntry { get; set; }
 
+    /// <summary>Produto do catálogo (Girus.Domain.Entities.Product) ao qual esta entrada deve somar estoque. Nulo = item avulso, sem baixa automática.</summary>
+    public string? ProductId { get; set; }
     public string Name { get; set; } = string.Empty;
     public string Code { get; set; } = string.Empty;
     public decimal Quantity { get; set; }
     public string Unit { get; set; } = "kg";
     public decimal UnitCost { get; set; }
     public decimal Subtotal { get; set; }
-    public DateOnly ExpiryDate { get; set; }
+    /// <summary>Nulo quando o item não tem data de validade informada (ex.: produto não perecível).</summary>
+    public DateOnly? ExpiryDate { get; set; }
     public string LotNumber { get; set; } = string.Empty;
     public bool IsPerishable { get; set; }
 }

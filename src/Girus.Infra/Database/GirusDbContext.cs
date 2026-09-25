@@ -1,6 +1,7 @@
 using Girus.Domain.Entities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.ChangeTracking;
+using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 namespace Girus.Infra.Database;
 
@@ -12,6 +13,7 @@ public class GirusDbContext(DbContextOptions<GirusDbContext> options) : DbContex
     public DbSet<Branch> Branches => Set<Branch>();
 
     public DbSet<Product> Products => Set<Product>();
+    public DbSet<ProductCategory> ProductCategories => Set<ProductCategory>();
     public DbSet<Kit> Kits => Set<Kit>();
     public DbSet<KitComponent> KitComponents => Set<KitComponent>();
 
@@ -31,6 +33,13 @@ public class GirusDbContext(DbContextOptions<GirusDbContext> options) : DbContex
     public DbSet<SaleRecord> SaleRecords => Set<SaleRecord>();
 
     public DbSet<AuditLogEntry> AuditLogEntries => Set<AuditLogEntry>();
+
+    protected override void ConfigureConventions(ModelConfigurationBuilder configurationBuilder)
+    {
+        // O PostgreSQL (timestamptz) só aceita DateTime com Kind=Utc. Datas vindas do front sem fuso
+        // (Kind=Unspecified) são tratadas como UTC; as locais são convertidas.
+        configurationBuilder.Properties<DateTime>().HaveConversion<UtcDateTimeConverter>();
+    }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -61,6 +70,7 @@ public class GirusDbContext(DbContextOptions<GirusDbContext> options) : DbContex
             e.HasOne(x => x.Company).WithMany().HasForeignKey(x => x.CompanyId).OnDelete(DeleteBehavior.Cascade);
             e.Property(x => x.Name).HasMaxLength(200).IsRequired();
             e.Property(x => x.Email).HasMaxLength(256).IsRequired();
+            e.Property(x => x.Salary).HasColumnType(moneyType);
         });
 
         modelBuilder.Entity<Branch>(e =>
@@ -78,6 +88,15 @@ public class GirusDbContext(DbContextOptions<GirusDbContext> options) : DbContex
             e.Property(x => x.MinStock).HasColumnType(qtyType);
             e.Property(x => x.CostPrice).HasColumnType(moneyType);
             e.Property(x => x.SellingPrice).HasColumnType(moneyType);
+        });
+
+        modelBuilder.Entity<ProductCategory>(e =>
+        {
+            e.HasKey(x => x.Id);
+            e.HasOne(x => x.Company).WithMany().HasForeignKey(x => x.CompanyId).OnDelete(DeleteBehavior.Cascade);
+            e.Property(x => x.Name).HasMaxLength(100);
+            e.Property(x => x.Icon).HasMaxLength(60);
+            e.HasIndex(x => new { x.CompanyId, x.Name }).IsUnique();
         });
 
         modelBuilder.Entity<Kit>(e =>
@@ -187,7 +206,7 @@ public class GirusDbContext(DbContextOptions<GirusDbContext> options) : DbContex
                         (a, b) => (a ?? new()).SequenceEqual(b ?? new()),
                         v => v.Aggregate(0, (hash, s) => HashCode.Combine(hash, s.GetHashCode())),
                         v => v.ToList()))
-                .HasColumnType("nvarchar(max)");
+                .HasColumnType("text");
         });
 
         modelBuilder.Entity<Client>(e =>
@@ -217,3 +236,7 @@ public class GirusDbContext(DbContextOptions<GirusDbContext> options) : DbContex
         });
     }
 }
+
+internal sealed class UtcDateTimeConverter() : ValueConverter<DateTime, DateTime>(
+    v => v.Kind == DateTimeKind.Utc ? v : v.Kind == DateTimeKind.Local ? v.ToUniversalTime() : DateTime.SpecifyKind(v, DateTimeKind.Utc),
+    v => DateTime.SpecifyKind(v, DateTimeKind.Utc));

@@ -45,6 +45,9 @@ public class Employee
     public string Role { get; set; } = "operador";
     public bool Active { get; set; } = true;
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+
+    /// <summary>Salário mensal — somado automaticamente ao fechamento mensal (Financeiro &amp; DRE &gt; Visão Mensal).</summary>
+    public decimal Salary { get; set; }
 }
 
 /// <summary>Type: "matriz" | "filial" | "cd".</summary>

@@ -13,7 +13,8 @@ public record AccountsPayableDto(
     string Origin,
     string Status,
     DateOnly? PaidDate,
-    bool? ReceiptAttached);
+    bool? ReceiptAttached,
+    string Category);
 
 public record AddPayableRequest(
     string? Supplier,
@@ -24,7 +25,8 @@ public record AddPayableRequest(
     string? DueLabel,
     decimal? Amount,
     string? PaymentMethod,
-    string? Origin);
+    string? Origin,
+    string? Category);
 
 public record SettlePayableRequest(string BankAccount, string PaymentMode);
 

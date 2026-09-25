@@ -3,7 +3,7 @@ using Microsoft.Extensions.Diagnostics.HealthChecks;
 
 namespace Girus.Infra.HealthChecks;
 
-public sealed class SqlServerHealthCheck(IDatabaseProbe databaseProbe) : IHealthCheck
+public sealed class DatabaseHealthCheck(IDatabaseProbe databaseProbe) : IHealthCheck
 {
     public async Task<HealthCheckResult> CheckHealthAsync(
         HealthCheckContext context,
@@ -17,7 +17,7 @@ public sealed class SqlServerHealthCheck(IDatabaseProbe databaseProbe) : IHealth
         };
 
         return result.Success
-            ? HealthCheckResult.Healthy("SQL Server disponível (SELECT 1).", data)
-            : HealthCheckResult.Unhealthy($"Falha ao consultar SQL Server: {result.Error}", data: data);
+            ? HealthCheckResult.Healthy("PostgreSQL disponível (SELECT 1).", data)
+            : HealthCheckResult.Unhealthy($"Falha ao consultar PostgreSQL: {result.Error}", data: data);
     }
 }

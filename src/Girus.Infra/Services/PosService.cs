@@ -32,6 +32,47 @@ public class PosService(GirusDbContext db, ICurrentUserContext currentUser, IAud
             AuditLink = "Cupom SAT",
         });
 
+        // Baixa automática de estoque: produto avulso desconta ele mesmo; kit desconta cada componente
+        // proporcionalmente à quantidade de kits vendidos.
+        var productIds = request.Items.Where(i => !string.IsNullOrEmpty(i.ProductId)).Select(i => i.ProductId!).Distinct().ToList();
+        var kitIds = request.Items.Where(i => !string.IsNullOrEmpty(i.KitId)).Select(i => i.KitId!).Distinct().ToList();
+
+        var products = productIds.Count > 0
+            ? await db.Products.Where(p => p.CompanyId == currentUser.CompanyId && productIds.Contains(p.Id)).ToDictionaryAsync(p => p.Id, ct)
+            : new Dictionary<string, Product>();
+        var kits = kitIds.Count > 0
+            ? await db.Kits.Include(k => k.Components).Where(k => k.CompanyId == currentUser.CompanyId && kitIds.Contains(k.Id)).ToDictionaryAsync(k => k.Id, ct)
+            : new Dictionary<string, Kit>();
+
+        foreach (var item in request.Items)
+        {
+            if (!string.IsNullOrEmpty(item.ProductId) && products.TryGetValue(item.ProductId, out var product))
+            {
+                product.Stock -= item.Qty;
+                continue;
+            }
+
+            if (!string.IsNullOrEmpty(item.KitId) && kits.TryGetValue(item.KitId, out var kit))
+            {
+                kit.StockAvailable = Math.Max(0, kit.StockAvailable - item.Qty);
+                foreach (var component in kit.Components)
+                {
+                    if (products.TryGetValue(component.ProductId, out var componentProduct))
+                    {
+                        componentProduct.Stock -= component.Quantity * item.Qty;
+                        continue;
+                    }
+
+                    var loaded = await db.Products.FirstOrDefaultAsync(p => p.Id == component.ProductId && p.CompanyId == currentUser.CompanyId, ct);
+                    if (loaded is not null)
+                    {
+                        loaded.Stock -= component.Quantity * item.Qty;
+                        products[loaded.Id] = loaded;
+                    }
+                }
+            }
+        }
+
         // Pagamento a crédito/parcelado gera um recebível de adquirente para D+30.
         if (request.PaymentMode is "credito_vista" or "parcelado")
         {

@@ -1,6 +1,14 @@
 namespace Girus.Application.Pdv;
 
-public record PosSaleItem(string Name, decimal Qty, string Unit, decimal Price);
+public record PosSaleItem(
+    string Name,
+    decimal Qty,
+    string Unit,
+    decimal Price,
+    // Informado quando o item vendido é um produto avulso do catálogo — a venda baixa Qty do estoque dele.
+    string? ProductId = null,
+    // Informado quando o item vendido é um Kit de Churrasco — a venda baixa (Qty * quantidade do componente) de cada produto que compõe o kit.
+    string? KitId = null);
 
 public record FinalizeSaleRequest(
     decimal Total,

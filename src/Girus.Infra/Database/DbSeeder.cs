@@ -206,6 +206,7 @@ public static class DbSeeder
                 SettlementTerm = "D+1",
                 Active = true,
                 Icon = "credit_card",
+                SortOrder = 0,
             },
             new PaymentFeeSetting
             {
@@ -217,6 +218,7 @@ public static class DbSeeder
                 SettlementTerm = "D+30",
                 Active = true,
                 Icon = "credit_card",
+                SortOrder = 1,
             },
             new PaymentFeeSetting
             {
@@ -228,6 +230,7 @@ public static class DbSeeder
                 SettlementTerm = "D+0",
                 Active = true,
                 Icon = "pix",
+                SortOrder = 2,
             });
     }
 }
