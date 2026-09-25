@@ -1,12 +1,12 @@
 namespace Girus.Application.Audit;
 
 public record AuditLogEntryDto(
-    string Id,
+    Guid Id,
     DateTime Timestamp,
-    string UserId,
+    Guid UserId,
     string UserName,
     string UserRole,
-    string CompanyId,
+    Guid CompanyId,
     string Action,
     string EntityType,
     string EntityLabel,

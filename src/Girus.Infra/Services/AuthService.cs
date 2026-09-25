@@ -79,7 +79,7 @@ public class AuthService(
         db.AuditLogEntries.Add(new AuditLogEntry
         {
             CompanyId = company.Id,
-            UserId = "usr-" + admin.Id,
+            UserId = admin.Id,
             UserName = admin.Name,
             UserRole = "admin",
             Action = "criou",
@@ -166,7 +166,7 @@ public class AuthService(
         return result;
     }
 
-    public async Task<string?> GetCompanyOwnerEmailAsync(string companyId, CancellationToken ct)
+    public async Task<string?> GetCompanyOwnerEmailAsync(Guid companyId, CancellationToken ct)
     {
         var company = await db.Companies.FirstOrDefaultAsync(c => c.Id == companyId, ct);
         if (company is null) return null;
@@ -176,14 +176,14 @@ public class AuthService(
     private async Task<AuthSessionDto> BuildSessionAsync(
         Administrator admin,
         Company company,
-        string? employeeId,
+        Guid? employeeId,
         string role,
         string userName,
         CancellationToken ct,
-        string? userId = null,
+        Guid? userId = null,
         string? userEmail = null)
     {
-        var resolvedUserId = userId ?? "usr-" + admin.Id;
+        var resolvedUserId = userId ?? admin.Id;
         var resolvedEmail = userEmail ?? admin.Email;
 
         var (token, _) = jwtTokenService.IssueToken(new JwtIssueRequest(

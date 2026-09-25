@@ -10,12 +10,12 @@ public record PurchaseItemDto(
     DateOnly? ExpiryDate,
     string LotNumber,
     bool IsPerishable,
-    string? Id = null,
+    Guid? Id = null,
     // Id do produto no catálogo — quando informado, a entrada soma automaticamente ao estoque dele.
-    string? ProductId = null);
+    Guid? ProductId = null);
 
 public record PurchaseEntryDto(
-    string Id,
+    Guid Id,
     string OrderCode,
     string NfeNumber,
     string NfeSeries,
@@ -61,5 +61,5 @@ public interface IPurchaseService
     /// Edita uma entrada existente: reverte o estoque somado pelos itens antigos, aplica os itens novos e
     /// recalcula a validade mais próxima dos produtos afetados (antigos e novos). Retorna null se não encontrada.
     /// </summary>
-    Task<PurchaseEntryDto?> UpdateAsync(string id, SavePurchaseRequest request, CancellationToken ct);
+    Task<PurchaseEntryDto?> UpdateAsync(Guid id, SavePurchaseRequest request, CancellationToken ct);
 }

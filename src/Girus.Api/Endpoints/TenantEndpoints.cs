@@ -22,4 +22,4 @@ public static class TenantEndpoints
     }
 }
 
-public record SwitchCompanyRequest(string CompanyId);
+public record SwitchCompanyRequest(Guid CompanyId);

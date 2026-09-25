@@ -10,7 +10,7 @@ public class HttpCurrentUserContext(IHttpContextAccessor accessor) : ICurrentUse
 
     public bool IsAuthenticated => User?.Identity?.IsAuthenticated ?? false;
 
-    public string UserId => User?.FindFirstValue(System.IdentityModel.Tokens.Jwt.JwtRegisteredClaimNames.Sub)
+    public Guid UserId => ParseGuid(User?.FindFirstValue(System.IdentityModel.Tokens.Jwt.JwtRegisteredClaimNames.Sub))
         ?? throw new InvalidOperationException("Usuário não autenticado.");
 
     public string UserName => User?.FindFirstValue(ClaimTypes.Name) ?? string.Empty;
@@ -19,12 +19,14 @@ public class HttpCurrentUserContext(IHttpContextAccessor accessor) : ICurrentUse
 
     public string Role => User?.FindFirstValue(ClaimTypes.Role) ?? string.Empty;
 
-    public string CompanyId => User?.FindFirstValue(ClaimTypesGirus.CompanyId)
+    public Guid CompanyId => ParseGuid(User?.FindFirstValue(ClaimTypesGirus.CompanyId))
         ?? throw new InvalidOperationException("Token sem empresa associada.");
 
-    public string? AdministratorId => User?.FindFirstValue(ClaimTypesGirus.AdministratorId);
+    public Guid? AdministratorId => ParseGuid(User?.FindFirstValue(ClaimTypesGirus.AdministratorId));
 
-    public string? EmployeeId => User?.FindFirstValue(ClaimTypesGirus.EmployeeId);
+    public Guid? EmployeeId => ParseGuid(User?.FindFirstValue(ClaimTypesGirus.EmployeeId));
 
-    public bool IsOwner => !string.IsNullOrEmpty(AdministratorId);
+    public bool IsOwner => AdministratorId.HasValue;
+
+    private static Guid? ParseGuid(string? value) => Guid.TryParse(value, out var id) ? id : null;
 }

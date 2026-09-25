@@ -3,8 +3,8 @@ namespace Girus.Domain.Entities;
 /// <summary>Type: "pf" | "pj".</summary>
 public class Client
 {
-    public string Id { get; set; } = "cli_" + Guid.NewGuid().ToString("N");
-    public string CompanyId { get; set; } = string.Empty;
+    public Guid Id { get; set; } = Guid.CreateVersion7();
+    public Guid CompanyId { get; set; }
     public Company? Company { get; set; }
 
     public string Name { get; set; } = string.Empty;
@@ -21,11 +21,11 @@ public class Client
 
 public class SaleRecord
 {
-    public string Id { get; set; } = "salerec_" + Guid.NewGuid().ToString("N");
-    public string CompanyId { get; set; } = string.Empty;
+    public Guid Id { get; set; } = Guid.CreateVersion7();
+    public Guid CompanyId { get; set; }
     public Company? Company { get; set; }
 
-    public string SaleId { get; set; } = string.Empty;
+    public Guid SaleId { get; set; }
     public DateTime Timestamp { get; set; } = DateTime.UtcNow;
     public decimal Total { get; set; }
     public decimal NetAmount { get; set; }

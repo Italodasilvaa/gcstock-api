@@ -20,7 +20,7 @@ public class EmployeeService(GirusDbContext db, ICurrentUserContext currentUser,
 
     public async Task<EmployeeDto> SaveAsync(SaveEmployeeRequest request, CancellationToken ct)
     {
-        if (!string.IsNullOrEmpty(request.Id))
+        if (request.Id.HasValue)
         {
             var existing = await db.Employees.FirstOrDefaultAsync(e => e.Id == request.Id && e.CompanyId == currentUser.CompanyId, ct);
             if (existing is not null)
@@ -54,7 +54,7 @@ public class EmployeeService(GirusDbContext db, ICurrentUserContext currentUser,
         return ToDto(employee);
     }
 
-    public async Task DeleteAsync(string id, CancellationToken ct)
+    public async Task DeleteAsync(Guid id, CancellationToken ct)
     {
         var target = await db.Employees.FirstOrDefaultAsync(e => e.Id == id && e.CompanyId == currentUser.CompanyId, ct);
         if (target is null) return;
@@ -64,7 +64,7 @@ public class EmployeeService(GirusDbContext db, ICurrentUserContext currentUser,
         await audit.RecordAsync("excluiu", "Funcionário", target.Name, null, ct);
     }
 
-    public async Task<EmployeeDto?> TransferAsync(string employeeId, string targetCompanyId, CancellationToken ct)
+    public async Task<EmployeeDto?> TransferAsync(Guid employeeId, Guid targetCompanyId, CancellationToken ct)
     {
         if (!currentUser.IsOwner) return null;
 

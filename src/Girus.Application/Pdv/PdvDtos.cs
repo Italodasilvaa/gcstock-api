@@ -6,22 +6,22 @@ public record PosSaleItem(
     string Unit,
     decimal Price,
     // Informado quando o item vendido é um produto avulso do catálogo — a venda baixa Qty do estoque dele.
-    string? ProductId = null,
+    Guid? ProductId = null,
     // Informado quando o item vendido é um Kit de Churrasco — a venda baixa (Qty * quantidade do componente) de cada produto que compõe o kit.
-    string? KitId = null);
+    Guid? KitId = null);
 
 public record FinalizeSaleRequest(
     decimal Total,
     string PaymentMode,
     string? CardFlag,
-    string? ClientId,
+    Guid? ClientId,
     string? ClientName,
     DateOnly? DueDate,
     decimal FeeAmount,
     decimal NetAmount,
     List<PosSaleItem> Items);
 
-public record FinalizeSaleResult(string SaleId, string ReceiptNumber);
+public record FinalizeSaleResult(Guid SaleId, string ReceiptNumber);
 
 public interface IPosService
 {

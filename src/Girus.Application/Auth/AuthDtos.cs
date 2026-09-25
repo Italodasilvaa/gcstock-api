@@ -1,11 +1,11 @@
 namespace Girus.Application.Auth;
 
 public record CompanySummaryDto(
-    string Id,
+    Guid Id,
     string CorporateName,
     string TradeName,
     string Document,
-    string OwnerId,
+    Guid OwnerId,
     string OwnerName,
     string Phone,
     string Segment,
@@ -16,7 +16,7 @@ public record CompanySummaryDto(
     int BranchesCount,
     string Plan);
 
-public record AuthUserDto(string Id, string Name, string Email, string Role, string? EmployeeId);
+public record AuthUserDto(Guid Id, string Name, string Email, string Role, Guid? EmployeeId);
 
 public record AuthSessionDto(AuthUserDto User, CompanySummaryDto Company, string Token, DateTime LoggedInAt);
 

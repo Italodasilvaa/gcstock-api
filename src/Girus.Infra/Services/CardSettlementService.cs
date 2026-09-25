@@ -17,7 +17,7 @@ public class CardSettlementService(GirusDbContext db, ICurrentUserContext curren
             .ToListAsync(ct);
     }
 
-    public async Task AnticipateAsync(string id, CancellationToken ct)
+    public async Task AnticipateAsync(Guid id, CancellationToken ct)
     {
         var item = await db.CardSettlements.FirstOrDefaultAsync(c => c.Id == id && c.CompanyId == currentUser.CompanyId, ct);
         if (item is null) return;
@@ -29,7 +29,7 @@ public class CardSettlementService(GirusDbContext db, ICurrentUserContext curren
         item.SettlementDate = "Hoje (Antecipado)";
 
         await db.SaveChangesAsync(ct);
-        await audit.RecordAsync("antecipou", "Liquidação de Cartão", id, null, ct);
+        await audit.RecordAsync("antecipou", "Liquidação de Cartão", id.ToString(), null, ct);
     }
 
     private static CardSettlementDto ToDto(Domain.Entities.CardSettlement c) => new(

@@ -1,7 +1,7 @@
 namespace Girus.Application.Finance;
 
 public record AccountsPayableDto(
-    string Id,
+    Guid Id,
     string Supplier,
     string Description,
     string NfeReference,
@@ -34,5 +34,5 @@ public interface IPayableService
 {
     Task<List<AccountsPayableDto>> GetAllAsync(CancellationToken ct);
     Task<AccountsPayableDto> AddAsync(AddPayableRequest request, CancellationToken ct);
-    Task<AccountsPayableDto?> SettleAsync(string id, SettlePayableRequest request, CancellationToken ct);
+    Task<AccountsPayableDto?> SettleAsync(Guid id, SettlePayableRequest request, CancellationToken ct);
 }

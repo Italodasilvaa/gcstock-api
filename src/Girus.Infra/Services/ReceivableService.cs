@@ -46,7 +46,7 @@ public class ReceivableService(GirusDbContext db, ICurrentUserContext currentUse
         return ToDto(saved);
     }
 
-    public async Task<AccountsReceivableDto?> SettleAsync(string id, CancellationToken ct)
+    public async Task<AccountsReceivableDto?> SettleAsync(Guid id, CancellationToken ct)
     {
         var item = await db.AccountsReceivables.FirstOrDefaultAsync(r => r.Id == id && r.CompanyId == currentUser.CompanyId, ct);
         if (item is null) return null;

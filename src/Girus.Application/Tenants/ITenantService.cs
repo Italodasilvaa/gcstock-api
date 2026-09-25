@@ -3,7 +3,7 @@ using Girus.Application.Auth;
 namespace Girus.Application.Tenants;
 
 public record BranchDto(
-    string Id,
+    Guid Id,
     string Name,
     string Location,
     string Cnpj,
@@ -18,7 +18,7 @@ public interface ITenantService
 
     /// <summary>Troca a empresa ativa. Só é permitida entre empresas do mesmo Administrator, e só para o próprio dono
     /// (funcionário não troca de empresa). Retorna null quando a troca não é permitida.</summary>
-    Task<AuthSessionDto?> SwitchCompanyAsync(string companyId, CancellationToken ct);
+    Task<AuthSessionDto?> SwitchCompanyAsync(Guid companyId, CancellationToken ct);
 
     Task<List<BranchDto>> GetBranchesAsync(CancellationToken ct);
 }

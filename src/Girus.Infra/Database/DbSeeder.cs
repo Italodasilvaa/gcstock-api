@@ -17,7 +17,7 @@ public static class DbSeeder
 
         var italo = new Administrator
         {
-            Id = "admin-001",
+            Id = Guid.Parse("00000000-0000-0000-0000-00000000a001"),
             Name = "Ítalo Silva",
             Email = "italodasilvaa@gmail.com",
             PasswordHash = passwordHasher.Hash("123"),
@@ -25,7 +25,7 @@ public static class DbSeeder
         };
         var roberto = new Administrator
         {
-            Id = "admin-002",
+            Id = Guid.Parse("00000000-0000-0000-0000-00000000a002"),
             Name = "Roberto Mendonça",
             Email = "contato@angusprime.com.br",
             PasswordHash = passwordHasher.Hash("123"),
@@ -33,7 +33,7 @@ public static class DbSeeder
         };
         var mariana = new Administrator
         {
-            Id = "admin-003",
+            Id = Guid.Parse("00000000-0000-0000-0000-00000000a003"),
             Name = "Mariana Duarte",
             Email = "diretoria@braseirodosul.com.br",
             PasswordHash = passwordHasher.Hash("123"),
@@ -43,7 +43,7 @@ public static class DbSeeder
 
         var mcFrig = new Company
         {
-            Id = "comp-001",
+            Id = Guid.Parse("00000000-0000-0000-0000-00000000c001"),
             CorporateName = "M&C Frig Distribuição de Carnes Ltda",
             TradeName = "M&C Frig Carnes Nobres",
             Document = "12.345.678/0001-90",
@@ -58,7 +58,7 @@ public static class DbSeeder
         };
         var angusPrime = new Company
         {
-            Id = "comp-002",
+            Id = Guid.Parse("00000000-0000-0000-0000-00000000c002"),
             CorporateName = "Angus Prime Cortes Especiais EIRELI",
             TradeName = "Angus Prime Steakhouse & Boutique",
             Document = "28.910.441/0001-30",
@@ -73,7 +73,7 @@ public static class DbSeeder
         };
         var braseiroDoSul = new Company
         {
-            Id = "comp-003",
+            Id = Guid.Parse("00000000-0000-0000-0000-00000000c003"),
             CorporateName = "Frigorífico e Abatedouro Braseiro do Sul S/A",
             TradeName = "Frigorífico Braseiro do Sul",
             Document = "45.890.112/0001-88",
@@ -88,7 +88,7 @@ public static class DbSeeder
         };
         var mcFrigLitoral = new Company
         {
-            Id = "comp-004",
+            Id = Guid.Parse("00000000-0000-0000-0000-00000000c004"),
             CorporateName = "M&C Frig Litoral Comércio de Carnes Ltda",
             TradeName = "M&C Frig Litoral",
             Document = "12.345.678/0004-15",
@@ -129,7 +129,7 @@ public static class DbSeeder
         await db.SaveChangesAsync(ct);
     }
 
-    private static void SeedDemoDataFor(GirusDbContext db, string companyId)
+    private static void SeedDemoDataFor(GirusDbContext db, Guid companyId)
     {
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
 

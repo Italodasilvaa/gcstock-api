@@ -24,8 +24,9 @@ namespace Girus.Infra.Database.Migrations
 
             modelBuilder.Entity("Girus.Domain.Entities.AccountsPayable", b =>
                 {
-                    b.Property<string>("Id")
-                        .HasColumnType("text");
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
 
                     b.Property<decimal>("Amount")
                         .HasColumnType("decimal(18,2)");
@@ -34,9 +35,8 @@ namespace Girus.Infra.Database.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
-                    b.Property<string>("CompanyId")
-                        .IsRequired()
-                        .HasColumnType("text");
+                    b.Property<Guid>("CompanyId")
+                        .HasColumnType("uuid");
 
                     b.Property<string>("Description")
                         .IsRequired()
@@ -67,8 +67,8 @@ namespace Girus.Infra.Database.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
-                    b.Property<string>("PurchaseEntryId")
-                        .HasColumnType("text");
+                    b.Property<Guid?>("PurchaseEntryId")
+                        .HasColumnType("uuid");
 
                     b.Property<bool>("ReceiptAttached")
                         .HasColumnType("boolean");
@@ -90,19 +90,19 @@ namespace Girus.Infra.Database.Migrations
 
             modelBuilder.Entity("Girus.Domain.Entities.AccountsReceivable", b =>
                 {
-                    b.Property<string>("Id")
-                        .HasColumnType("text");
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
 
-                    b.Property<string>("ClientId")
-                        .HasColumnType("text");
+                    b.Property<Guid?>("ClientId")
+                        .HasColumnType("uuid");
 
                     b.Property<string>("ClientOrOrigin")
                         .IsRequired()
                         .HasColumnType("text");
 
-                    b.Property<string>("CompanyId")
-                        .IsRequired()
-                        .HasColumnType("text");
+                    b.Property<Guid>("CompanyId")
+                        .HasColumnType("uuid");
 
                     b.Property<DateOnly>("DueDate")
                         .HasColumnType("date");
@@ -152,8 +152,9 @@ namespace Girus.Infra.Database.Migrations
 
             modelBuilder.Entity("Girus.Domain.Entities.Administrator", b =>
                 {
-                    b.Property<string>("Id")
-                        .HasColumnType("text");
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
 
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
@@ -182,8 +183,8 @@ namespace Girus.Infra.Database.Migrations
 
             modelBuilder.Entity("Girus.Domain.Entities.AlertSetting", b =>
                 {
-                    b.Property<string>("CompanyId")
-                        .HasColumnType("text");
+                    b.Property<Guid>("CompanyId")
+                        .HasColumnType("uuid");
 
                     b.Property<int>("AlertLeadDays")
                         .HasColumnType("integer");
@@ -212,16 +213,16 @@ namespace Girus.Infra.Database.Migrations
 
             modelBuilder.Entity("Girus.Domain.Entities.AuditLogEntry", b =>
                 {
-                    b.Property<string>("Id")
-                        .HasColumnType("text");
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
 
                     b.Property<string>("Action")
                         .IsRequired()
                         .HasColumnType("text");
 
-                    b.Property<string>("CompanyId")
-                        .IsRequired()
-                        .HasColumnType("text");
+                    b.Property<Guid>("CompanyId")
+                        .HasColumnType("uuid");
 
                     b.Property<string>("Details")
                         .HasColumnType("text");
@@ -237,9 +238,8 @@ namespace Girus.Infra.Database.Migrations
                     b.Property<DateTime>("Timestamp")
                         .HasColumnType("timestamp with time zone");
 
-                    b.Property<string>("UserId")
-                        .IsRequired()
-                        .HasColumnType("text");
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
 
                     b.Property<string>("UserName")
                         .IsRequired()
@@ -258,8 +258,9 @@ namespace Girus.Infra.Database.Migrations
 
             modelBuilder.Entity("Girus.Domain.Entities.Branch", b =>
                 {
-                    b.Property<string>("Id")
-                        .HasColumnType("text");
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
 
                     b.Property<bool>("Active")
                         .HasColumnType("boolean");
@@ -268,9 +269,8 @@ namespace Girus.Infra.Database.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
-                    b.Property<string>("CompanyId")
-                        .IsRequired()
-                        .HasColumnType("text");
+                    b.Property<Guid>("CompanyId")
+                        .HasColumnType("uuid");
 
                     b.Property<string>("Location")
                         .IsRequired()
@@ -296,8 +296,9 @@ namespace Girus.Infra.Database.Migrations
 
             modelBuilder.Entity("Girus.Domain.Entities.CardSettlement", b =>
                 {
-                    b.Property<string>("Id")
-                        .HasColumnType("text");
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
 
                     b.Property<string>("Acquirer")
                         .IsRequired()
@@ -310,9 +311,8 @@ namespace Girus.Infra.Database.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
-                    b.Property<string>("CompanyId")
-                        .IsRequired()
-                        .HasColumnType("text");
+                    b.Property<Guid>("CompanyId")
+                        .HasColumnType("uuid");
 
                     b.Property<decimal>("GrossAmount")
                         .HasColumnType("decimal(18,2)");
@@ -343,12 +343,12 @@ namespace Girus.Infra.Database.Migrations
 
             modelBuilder.Entity("Girus.Domain.Entities.Client", b =>
                 {
-                    b.Property<string>("Id")
-                        .HasColumnType("text");
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
 
-                    b.Property<string>("CompanyId")
-                        .IsRequired()
-                        .HasColumnType("text");
+                    b.Property<Guid>("CompanyId")
+                        .HasColumnType("uuid");
 
                     b.Property<decimal>("CreditLimit")
                         .HasColumnType("decimal(18,2)");
@@ -394,8 +394,9 @@ namespace Girus.Infra.Database.Migrations
 
             modelBuilder.Entity("Girus.Domain.Entities.Company", b =>
                 {
-                    b.Property<string>("Id")
-                        .HasColumnType("text");
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
 
                     b.Property<bool>("Active")
                         .HasColumnType("boolean");
@@ -416,9 +417,8 @@ namespace Girus.Infra.Database.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
-                    b.Property<string>("OwnerId")
-                        .IsRequired()
-                        .HasColumnType("text");
+                    b.Property<Guid>("OwnerId")
+                        .HasColumnType("uuid");
 
                     b.Property<string>("Phone")
                         .IsRequired()
@@ -450,15 +450,15 @@ namespace Girus.Infra.Database.Migrations
 
             modelBuilder.Entity("Girus.Domain.Entities.Employee", b =>
                 {
-                    b.Property<string>("Id")
-                        .HasColumnType("text");
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
 
                     b.Property<bool>("Active")
                         .HasColumnType("boolean");
 
-                    b.Property<string>("CompanyId")
-                        .IsRequired()
-                        .HasColumnType("text");
+                    b.Property<Guid>("CompanyId")
+                        .HasColumnType("uuid");
 
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
@@ -496,8 +496,9 @@ namespace Girus.Infra.Database.Migrations
 
             modelBuilder.Entity("Girus.Domain.Entities.Kit", b =>
                 {
-                    b.Property<string>("Id")
-                        .HasColumnType("text");
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
 
                     b.Property<string>("BarcodeEan")
                         .IsRequired()
@@ -507,9 +508,8 @@ namespace Girus.Infra.Database.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
-                    b.Property<string>("CompanyId")
-                        .IsRequired()
-                        .HasColumnType("text");
+                    b.Property<Guid>("CompanyId")
+                        .HasColumnType("uuid");
 
                     b.Property<string>("ComponentsSummary")
                         .IsRequired()
@@ -563,8 +563,9 @@ namespace Girus.Infra.Database.Migrations
 
             modelBuilder.Entity("Girus.Domain.Entities.KitComponent", b =>
                 {
-                    b.Property<string>("Id")
-                        .HasColumnType("text");
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
 
                     b.Property<decimal>("AvailableStock")
                         .HasColumnType("decimal(18,3)");
@@ -573,9 +574,8 @@ namespace Girus.Infra.Database.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
-                    b.Property<string>("KitId")
-                        .IsRequired()
-                        .HasColumnType("text");
+                    b.Property<Guid>("KitId")
+                        .HasColumnType("uuid");
 
                     b.Property<string>("LotNumber")
                         .IsRequired()
@@ -585,9 +585,8 @@ namespace Girus.Infra.Database.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
-                    b.Property<string>("ProductId")
-                        .IsRequired()
-                        .HasColumnType("text");
+                    b.Property<Guid>("ProductId")
+                        .HasColumnType("uuid");
 
                     b.Property<decimal>("Quantity")
                         .HasColumnType("decimal(18,3)");
@@ -611,8 +610,9 @@ namespace Girus.Infra.Database.Migrations
 
             modelBuilder.Entity("Girus.Domain.Entities.PaymentFeeSetting", b =>
                 {
-                    b.Property<string>("Id")
-                        .HasColumnType("text");
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
 
                     b.Property<bool>("Active")
                         .HasColumnType("boolean");
@@ -621,9 +621,8 @@ namespace Girus.Infra.Database.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
-                    b.Property<string>("CompanyId")
-                        .IsRequired()
-                        .HasColumnType("text");
+                    b.Property<Guid>("CompanyId")
+                        .HasColumnType("uuid");
 
                     b.Property<decimal>("FeePercent")
                         .HasColumnType("decimal(9,4)");
@@ -659,8 +658,9 @@ namespace Girus.Infra.Database.Migrations
 
             modelBuilder.Entity("Girus.Domain.Entities.Product", b =>
                 {
-                    b.Property<string>("Id")
-                        .HasColumnType("text");
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
 
                     b.Property<int>("AlertDays")
                         .HasColumnType("integer");
@@ -673,9 +673,8 @@ namespace Girus.Infra.Database.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
-                    b.Property<string>("CompanyId")
-                        .IsRequired()
-                        .HasColumnType("text");
+                    b.Property<Guid>("CompanyId")
+                        .HasColumnType("uuid");
 
                     b.Property<decimal>("CostPrice")
                         .HasColumnType("decimal(18,2)");
@@ -749,12 +748,12 @@ namespace Girus.Infra.Database.Migrations
 
             modelBuilder.Entity("Girus.Domain.Entities.ProductCategory", b =>
                 {
-                    b.Property<string>("Id")
-                        .HasColumnType("text");
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
 
-                    b.Property<string>("CompanyId")
-                        .IsRequired()
-                        .HasColumnType("text");
+                    b.Property<Guid>("CompanyId")
+                        .HasColumnType("uuid");
 
                     b.Property<string>("Icon")
                         .IsRequired()
@@ -779,12 +778,12 @@ namespace Girus.Infra.Database.Migrations
 
             modelBuilder.Entity("Girus.Domain.Entities.PurchaseEntry", b =>
                 {
-                    b.Property<string>("Id")
-                        .HasColumnType("text");
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
 
-                    b.Property<string>("CompanyId")
-                        .IsRequired()
-                        .HasColumnType("text");
+                    b.Property<Guid>("CompanyId")
+                        .HasColumnType("uuid");
 
                     b.Property<DateOnly>("EntryDate")
                         .HasColumnType("date");
@@ -854,8 +853,9 @@ namespace Girus.Infra.Database.Migrations
 
             modelBuilder.Entity("Girus.Domain.Entities.PurchaseItem", b =>
                 {
-                    b.Property<string>("Id")
-                        .HasColumnType("text");
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
 
                     b.Property<string>("Code")
                         .IsRequired()
@@ -875,12 +875,11 @@ namespace Girus.Infra.Database.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
-                    b.Property<string>("ProductId")
-                        .HasColumnType("text");
+                    b.Property<Guid?>("ProductId")
+                        .HasColumnType("uuid");
 
-                    b.Property<string>("PurchaseEntryId")
-                        .IsRequired()
-                        .HasColumnType("text");
+                    b.Property<Guid>("PurchaseEntryId")
+                        .HasColumnType("uuid");
 
                     b.Property<decimal>("Quantity")
                         .HasColumnType("decimal(18,3)");
@@ -904,15 +903,15 @@ namespace Girus.Infra.Database.Migrations
 
             modelBuilder.Entity("Girus.Domain.Entities.SaleRecord", b =>
                 {
-                    b.Property<string>("Id")
-                        .HasColumnType("text");
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
 
                     b.Property<string>("ClientName")
                         .HasColumnType("text");
 
-                    b.Property<string>("CompanyId")
-                        .IsRequired()
-                        .HasColumnType("text");
+                    b.Property<Guid>("CompanyId")
+                        .HasColumnType("uuid");
 
                     b.Property<decimal>("FeeAmount")
                         .HasColumnType("decimal(18,2)");
@@ -924,9 +923,8 @@ namespace Girus.Infra.Database.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
-                    b.Property<string>("SaleId")
-                        .IsRequired()
-                        .HasColumnType("text");
+                    b.Property<Guid>("SaleId")
+                        .HasColumnType("uuid");
 
                     b.Property<string>("SoldBy")
                         .IsRequired()
@@ -947,15 +945,15 @@ namespace Girus.Infra.Database.Migrations
 
             modelBuilder.Entity("Girus.Domain.Entities.StockBatch", b =>
                 {
-                    b.Property<string>("Id")
-                        .HasColumnType("text");
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
 
                     b.Property<decimal>("AvailableKg")
                         .HasColumnType("decimal(18,3)");
 
-                    b.Property<string>("CompanyId")
-                        .IsRequired()
-                        .HasColumnType("text");
+                    b.Property<Guid>("CompanyId")
+                        .HasColumnType("uuid");
 
                     b.Property<int>("DaysRemaining")
                         .HasColumnType("integer");
@@ -974,16 +972,15 @@ namespace Girus.Infra.Database.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
-                    b.Property<string>("ProductId")
-                        .IsRequired()
-                        .HasColumnType("text");
+                    b.Property<Guid>("ProductId")
+                        .HasColumnType("uuid");
 
                     b.Property<string>("ProductName")
                         .IsRequired()
                         .HasColumnType("text");
 
-                    b.Property<string>("PurchaseEntryId")
-                        .HasColumnType("text");
+                    b.Property<Guid?>("PurchaseEntryId")
+                        .HasColumnType("uuid");
 
                     b.Property<string>("Sku")
                         .IsRequired()
@@ -1006,8 +1003,9 @@ namespace Girus.Infra.Database.Migrations
 
             modelBuilder.Entity("Girus.Domain.Entities.StockMovement", b =>
                 {
-                    b.Property<string>("Id")
-                        .HasColumnType("text");
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
 
                     b.Property<decimal>("AmountKg")
                         .HasColumnType("decimal(18,3)");
@@ -1020,9 +1018,8 @@ namespace Girus.Infra.Database.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
-                    b.Property<string>("CompanyId")
-                        .IsRequired()
-                        .HasColumnType("text");
+                    b.Property<Guid>("CompanyId")
+                        .HasColumnType("uuid");
 
                     b.Property<string>("Description")
                         .IsRequired()
@@ -1032,8 +1029,8 @@ namespace Girus.Infra.Database.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
-                    b.Property<string>("PurchaseEntryId")
-                        .HasColumnType("text");
+                    b.Property<Guid?>("PurchaseEntryId")
+                        .HasColumnType("uuid");
 
                     b.Property<DateTime>("Timestamp")
                         .HasColumnType("timestamp with time zone");

@@ -1,8 +1,8 @@
 namespace Girus.Application.Employees;
 
 public record EmployeeDto(
-    string Id,
-    string CompanyId,
+    Guid Id,
+    Guid CompanyId,
     string Name,
     string Email,
     string Role,
@@ -11,7 +11,7 @@ public record EmployeeDto(
     decimal Salary);
 
 public record SaveEmployeeRequest(
-    string? Id,
+    Guid? Id,
     string Name,
     string Email,
     string? Password,

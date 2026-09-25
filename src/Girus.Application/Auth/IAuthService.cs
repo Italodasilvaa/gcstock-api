@@ -17,5 +17,5 @@ public interface IAuthService
     Task<List<CompanySummaryDto>> ListCompaniesForLoginAsync(CancellationToken ct);
 
     /// <summary>Conveniência de demonstração para o "acesso rápido" da tela de login. Não deve ser usada em produção real.</summary>
-    Task<string?> GetCompanyOwnerEmailAsync(string companyId, CancellationToken ct);
+    Task<string?> GetCompanyOwnerEmailAsync(Guid companyId, CancellationToken ct);
 }

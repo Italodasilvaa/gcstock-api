@@ -27,7 +27,7 @@ public static class ConfiguracoesEndpoints
         group.MapPut("/taxas/ordem", async (ReorderFeesRequest request, IFeeService service, CancellationToken ct) =>
             Results.Ok(await service.ReorderAsync(request, ct)));
 
-        group.MapPatch("/taxas/{id}", async (string id, SaveFeeRequest request, IFeeService service, CancellationToken ct) =>
+        group.MapPatch("/taxas/{id:guid}", async (Guid id, SaveFeeRequest request, IFeeService service, CancellationToken ct) =>
             Results.Ok(await service.SaveAsync(request with { Id = id }, ct)));
 
         group.MapGet("/alertas-sanitarios", async (IAlertSettingService service, CancellationToken ct) =>

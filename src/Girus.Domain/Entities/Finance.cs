@@ -3,8 +3,8 @@ namespace Girus.Domain.Entities;
 /// <summary>Status: "vencido" | "a_vencer" | "pago".</summary>
 public class AccountsPayable
 {
-    public string Id { get; set; } = "pay_" + Guid.NewGuid().ToString("N");
-    public string CompanyId { get; set; } = string.Empty;
+    public Guid Id { get; set; } = Guid.CreateVersion7();
+    public Guid CompanyId { get; set; }
     public Company? Company { get; set; }
 
     public string Supplier { get; set; } = string.Empty;
@@ -24,14 +24,14 @@ public class AccountsPayable
     public string Category { get; set; } = "outros";
 
     /// <summary>Compra (Módulo Compras) que originou o título; ao dar baixa, a compra também passa a "pago".</summary>
-    public string? PurchaseEntryId { get; set; }
+    public Guid? PurchaseEntryId { get; set; }
 }
 
 /// <summary>Status: "vencido" | "a_vencer" | "recebido". Type: "b2b" | "adquirente" | "evento".</summary>
 public class AccountsReceivable
 {
-    public string Id { get; set; } = "rec_" + Guid.NewGuid().ToString("N");
-    public string CompanyId { get; set; } = string.Empty;
+    public Guid Id { get; set; } = Guid.CreateVersion7();
+    public Guid CompanyId { get; set; }
     public Company? Company { get; set; }
 
     public string ClientOrOrigin { get; set; } = string.Empty;
@@ -47,13 +47,13 @@ public class AccountsReceivable
     public string PaymentModeDesc { get; set; } = string.Empty;
     public DateOnly? ReceivedDate { get; set; }
 
-    public string? ClientId { get; set; }
+    public Guid? ClientId { get; set; }
 }
 
 public class PaymentFeeSetting
 {
-    public string Id { get; set; } = "fee_" + Guid.NewGuid().ToString("N");
-    public string CompanyId { get; set; } = string.Empty;
+    public Guid Id { get; set; } = Guid.CreateVersion7();
+    public Guid CompanyId { get; set; }
     public Company? Company { get; set; }
 
     public string Method { get; set; } = string.Empty;
@@ -71,8 +71,8 @@ public class PaymentFeeSetting
 /// <summary>Status: "a_liquidar" | "liquidado" | "antecipado".</summary>
 public class CardSettlement
 {
-    public string Id { get; set; } = "card_" + Guid.NewGuid().ToString("N");
-    public string CompanyId { get; set; } = string.Empty;
+    public Guid Id { get; set; } = Guid.CreateVersion7();
+    public Guid CompanyId { get; set; }
     public Company? Company { get; set; }
 
     public string Acquirer { get; set; } = string.Empty;
@@ -89,7 +89,7 @@ public class CardSettlement
 /// <summary>Configuração global de alertas sanitários, uma por empresa.</summary>
 public class AlertSetting
 {
-    public string CompanyId { get; set; } = string.Empty;
+    public Guid CompanyId { get; set; }
     public Company? Company { get; set; }
 
     public int AlertLeadDays { get; set; } = 3;

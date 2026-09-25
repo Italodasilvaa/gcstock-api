@@ -1,7 +1,7 @@
 namespace Girus.Application.Finance;
 
 public record PaymentFeeSettingDto(
-    string Id,
+    Guid Id,
     string Method,
     string Subtitle,
     string Channel,
@@ -12,10 +12,10 @@ public record PaymentFeeSettingDto(
     string Icon,
     int SortOrder);
 
-public record ReorderFeesRequest(List<string> Ids);
+public record ReorderFeesRequest(List<Guid> Ids);
 
 public record SaveFeeRequest(
-    string Id,
+    Guid Id,
     string? Method,
     string? Subtitle,
     string? Channel,

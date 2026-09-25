@@ -15,7 +15,7 @@ namespace Girus.Infra.Database.Migrations
                 name: "Administrators",
                 columns: table => new
                 {
-                    Id = table.Column<string>(type: "text", nullable: false),
+                    Id = table.Column<Guid>(type: "uuid", nullable: false),
                     Name = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: false),
                     Email = table.Column<string>(type: "character varying(256)", maxLength: 256, nullable: false),
                     PasswordHash = table.Column<string>(type: "text", nullable: false),
@@ -30,11 +30,11 @@ namespace Girus.Infra.Database.Migrations
                 name: "Companies",
                 columns: table => new
                 {
-                    Id = table.Column<string>(type: "text", nullable: false),
+                    Id = table.Column<Guid>(type: "uuid", nullable: false),
                     CorporateName = table.Column<string>(type: "character varying(250)", maxLength: 250, nullable: false),
                     TradeName = table.Column<string>(type: "character varying(250)", maxLength: 250, nullable: false),
                     Document = table.Column<string>(type: "text", nullable: false),
-                    OwnerId = table.Column<string>(type: "text", nullable: false),
+                    OwnerId = table.Column<Guid>(type: "uuid", nullable: false),
                     Phone = table.Column<string>(type: "text", nullable: false),
                     Segment = table.Column<string>(type: "text", nullable: false),
                     City = table.Column<string>(type: "text", nullable: false),
@@ -58,8 +58,8 @@ namespace Girus.Infra.Database.Migrations
                 name: "AccountsPayables",
                 columns: table => new
                 {
-                    Id = table.Column<string>(type: "text", nullable: false),
-                    CompanyId = table.Column<string>(type: "text", nullable: false),
+                    Id = table.Column<Guid>(type: "uuid", nullable: false),
+                    CompanyId = table.Column<Guid>(type: "uuid", nullable: false),
                     Supplier = table.Column<string>(type: "text", nullable: false),
                     Description = table.Column<string>(type: "text", nullable: false),
                     NfeReference = table.Column<string>(type: "text", nullable: false),
@@ -73,7 +73,7 @@ namespace Girus.Infra.Database.Migrations
                     PaidDate = table.Column<DateOnly>(type: "date", nullable: true),
                     ReceiptAttached = table.Column<bool>(type: "boolean", nullable: false),
                     Category = table.Column<string>(type: "text", nullable: false),
-                    PurchaseEntryId = table.Column<string>(type: "text", nullable: true)
+                    PurchaseEntryId = table.Column<Guid>(type: "uuid", nullable: true)
                 },
                 constraints: table =>
                 {
@@ -90,8 +90,8 @@ namespace Girus.Infra.Database.Migrations
                 name: "AccountsReceivables",
                 columns: table => new
                 {
-                    Id = table.Column<string>(type: "text", nullable: false),
-                    CompanyId = table.Column<string>(type: "text", nullable: false),
+                    Id = table.Column<Guid>(type: "uuid", nullable: false),
+                    CompanyId = table.Column<Guid>(type: "uuid", nullable: false),
                     ClientOrOrigin = table.Column<string>(type: "text", nullable: false),
                     SubCategory = table.Column<string>(type: "text", nullable: false),
                     Reference = table.Column<string>(type: "text", nullable: false),
@@ -104,7 +104,7 @@ namespace Girus.Infra.Database.Migrations
                     Type = table.Column<string>(type: "text", nullable: false),
                     PaymentModeDesc = table.Column<string>(type: "text", nullable: false),
                     ReceivedDate = table.Column<DateOnly>(type: "date", nullable: true),
-                    ClientId = table.Column<string>(type: "text", nullable: true)
+                    ClientId = table.Column<Guid>(type: "uuid", nullable: true)
                 },
                 constraints: table =>
                 {
@@ -121,7 +121,7 @@ namespace Girus.Infra.Database.Migrations
                 name: "AlertSettings",
                 columns: table => new
                 {
-                    CompanyId = table.Column<string>(type: "text", nullable: false),
+                    CompanyId = table.Column<Guid>(type: "uuid", nullable: false),
                     AlertLeadDays = table.Column<int>(type: "integer", nullable: false),
                     MorningSummaryTime = table.Column<string>(type: "text", nullable: false),
                     NotifyTopbar = table.Column<bool>(type: "boolean", nullable: false),
@@ -144,10 +144,10 @@ namespace Girus.Infra.Database.Migrations
                 name: "AuditLogEntries",
                 columns: table => new
                 {
-                    Id = table.Column<string>(type: "text", nullable: false),
-                    CompanyId = table.Column<string>(type: "text", nullable: false),
+                    Id = table.Column<Guid>(type: "uuid", nullable: false),
+                    CompanyId = table.Column<Guid>(type: "uuid", nullable: false),
                     Timestamp = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
-                    UserId = table.Column<string>(type: "text", nullable: false),
+                    UserId = table.Column<Guid>(type: "uuid", nullable: false),
                     UserName = table.Column<string>(type: "text", nullable: false),
                     UserRole = table.Column<string>(type: "text", nullable: false),
                     Action = table.Column<string>(type: "text", nullable: false),
@@ -170,8 +170,8 @@ namespace Girus.Infra.Database.Migrations
                 name: "Branches",
                 columns: table => new
                 {
-                    Id = table.Column<string>(type: "text", nullable: false),
-                    CompanyId = table.Column<string>(type: "text", nullable: false),
+                    Id = table.Column<Guid>(type: "uuid", nullable: false),
+                    CompanyId = table.Column<Guid>(type: "uuid", nullable: false),
                     Name = table.Column<string>(type: "text", nullable: false),
                     Location = table.Column<string>(type: "text", nullable: false),
                     Cnpj = table.Column<string>(type: "text", nullable: false),
@@ -194,8 +194,8 @@ namespace Girus.Infra.Database.Migrations
                 name: "CardSettlements",
                 columns: table => new
                 {
-                    Id = table.Column<string>(type: "text", nullable: false),
-                    CompanyId = table.Column<string>(type: "text", nullable: false),
+                    Id = table.Column<Guid>(type: "uuid", nullable: false),
+                    CompanyId = table.Column<Guid>(type: "uuid", nullable: false),
                     Acquirer = table.Column<string>(type: "text", nullable: false),
                     CardBrand = table.Column<string>(type: "text", nullable: false),
                     SaleDate = table.Column<DateOnly>(type: "date", nullable: false),
@@ -221,8 +221,8 @@ namespace Girus.Infra.Database.Migrations
                 name: "Clients",
                 columns: table => new
                 {
-                    Id = table.Column<string>(type: "text", nullable: false),
-                    CompanyId = table.Column<string>(type: "text", nullable: false),
+                    Id = table.Column<Guid>(type: "uuid", nullable: false),
+                    CompanyId = table.Column<Guid>(type: "uuid", nullable: false),
                     Name = table.Column<string>(type: "text", nullable: false),
                     Document = table.Column<string>(type: "text", nullable: false),
                     Phone = table.Column<string>(type: "text", nullable: false),
@@ -249,8 +249,8 @@ namespace Girus.Infra.Database.Migrations
                 name: "Employees",
                 columns: table => new
                 {
-                    Id = table.Column<string>(type: "text", nullable: false),
-                    CompanyId = table.Column<string>(type: "text", nullable: false),
+                    Id = table.Column<Guid>(type: "uuid", nullable: false),
+                    CompanyId = table.Column<Guid>(type: "uuid", nullable: false),
                     Name = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: false),
                     Email = table.Column<string>(type: "character varying(256)", maxLength: 256, nullable: false),
                     PasswordHash = table.Column<string>(type: "text", nullable: false),
@@ -274,8 +274,8 @@ namespace Girus.Infra.Database.Migrations
                 name: "Kits",
                 columns: table => new
                 {
-                    Id = table.Column<string>(type: "text", nullable: false),
-                    CompanyId = table.Column<string>(type: "text", nullable: false),
+                    Id = table.Column<Guid>(type: "uuid", nullable: false),
+                    CompanyId = table.Column<Guid>(type: "uuid", nullable: false),
                     Code = table.Column<string>(type: "text", nullable: false),
                     Name = table.Column<string>(type: "text", nullable: false),
                     Tag = table.Column<string>(type: "text", nullable: false),
@@ -306,8 +306,8 @@ namespace Girus.Infra.Database.Migrations
                 name: "PaymentFeeSettings",
                 columns: table => new
                 {
-                    Id = table.Column<string>(type: "text", nullable: false),
-                    CompanyId = table.Column<string>(type: "text", nullable: false),
+                    Id = table.Column<Guid>(type: "uuid", nullable: false),
+                    CompanyId = table.Column<Guid>(type: "uuid", nullable: false),
                     Method = table.Column<string>(type: "text", nullable: false),
                     Subtitle = table.Column<string>(type: "text", nullable: false),
                     Channel = table.Column<string>(type: "text", nullable: false),
@@ -333,8 +333,8 @@ namespace Girus.Infra.Database.Migrations
                 name: "ProductCategories",
                 columns: table => new
                 {
-                    Id = table.Column<string>(type: "text", nullable: false),
-                    CompanyId = table.Column<string>(type: "text", nullable: false),
+                    Id = table.Column<Guid>(type: "uuid", nullable: false),
+                    CompanyId = table.Column<Guid>(type: "uuid", nullable: false),
                     Name = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: false),
                     Icon = table.Column<string>(type: "character varying(60)", maxLength: 60, nullable: false),
                     SortOrder = table.Column<int>(type: "integer", nullable: false)
@@ -354,8 +354,8 @@ namespace Girus.Infra.Database.Migrations
                 name: "Products",
                 columns: table => new
                 {
-                    Id = table.Column<string>(type: "text", nullable: false),
-                    CompanyId = table.Column<string>(type: "text", nullable: false),
+                    Id = table.Column<Guid>(type: "uuid", nullable: false),
+                    CompanyId = table.Column<Guid>(type: "uuid", nullable: false),
                     Sku = table.Column<string>(type: "text", nullable: false),
                     Code = table.Column<string>(type: "text", nullable: false),
                     Ean = table.Column<string>(type: "text", nullable: false),
@@ -393,8 +393,8 @@ namespace Girus.Infra.Database.Migrations
                 name: "PurchaseEntries",
                 columns: table => new
                 {
-                    Id = table.Column<string>(type: "text", nullable: false),
-                    CompanyId = table.Column<string>(type: "text", nullable: false),
+                    Id = table.Column<Guid>(type: "uuid", nullable: false),
+                    CompanyId = table.Column<Guid>(type: "uuid", nullable: false),
                     OrderCode = table.Column<string>(type: "text", nullable: false),
                     NfeNumber = table.Column<string>(type: "text", nullable: false),
                     NfeSeries = table.Column<string>(type: "text", nullable: false),
@@ -427,9 +427,9 @@ namespace Girus.Infra.Database.Migrations
                 name: "SaleRecords",
                 columns: table => new
                 {
-                    Id = table.Column<string>(type: "text", nullable: false),
-                    CompanyId = table.Column<string>(type: "text", nullable: false),
-                    SaleId = table.Column<string>(type: "text", nullable: false),
+                    Id = table.Column<Guid>(type: "uuid", nullable: false),
+                    CompanyId = table.Column<Guid>(type: "uuid", nullable: false),
+                    SaleId = table.Column<Guid>(type: "uuid", nullable: false),
                     Timestamp = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
                     Total = table.Column<decimal>(type: "numeric(18,2)", nullable: false),
                     NetAmount = table.Column<decimal>(type: "numeric(18,2)", nullable: false),
@@ -453,9 +453,9 @@ namespace Girus.Infra.Database.Migrations
                 name: "StockBatches",
                 columns: table => new
                 {
-                    Id = table.Column<string>(type: "text", nullable: false),
-                    CompanyId = table.Column<string>(type: "text", nullable: false),
-                    ProductId = table.Column<string>(type: "text", nullable: false),
+                    Id = table.Column<Guid>(type: "uuid", nullable: false),
+                    CompanyId = table.Column<Guid>(type: "uuid", nullable: false),
+                    ProductId = table.Column<Guid>(type: "uuid", nullable: false),
                     ProductName = table.Column<string>(type: "text", nullable: false),
                     Sku = table.Column<string>(type: "text", nullable: false),
                     LotNumber = table.Column<string>(type: "text", nullable: false),
@@ -466,7 +466,7 @@ namespace Girus.Infra.Database.Migrations
                     FiscalDoc = table.Column<string>(type: "text", nullable: false),
                     Supplier = table.Column<string>(type: "text", nullable: false),
                     Status = table.Column<string>(type: "text", nullable: false),
-                    PurchaseEntryId = table.Column<string>(type: "text", nullable: true)
+                    PurchaseEntryId = table.Column<Guid>(type: "uuid", nullable: true)
                 },
                 constraints: table =>
                 {
@@ -483,8 +483,8 @@ namespace Girus.Infra.Database.Migrations
                 name: "StockMovements",
                 columns: table => new
                 {
-                    Id = table.Column<string>(type: "text", nullable: false),
-                    CompanyId = table.Column<string>(type: "text", nullable: false),
+                    Id = table.Column<Guid>(type: "uuid", nullable: false),
+                    CompanyId = table.Column<Guid>(type: "uuid", nullable: false),
                     Timestamp = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
                     Type = table.Column<string>(type: "text", nullable: false),
                     Title = table.Column<string>(type: "text", nullable: false),
@@ -493,7 +493,7 @@ namespace Girus.Infra.Database.Migrations
                     Description = table.Column<string>(type: "text", nullable: false),
                     BadgeLabel = table.Column<string>(type: "text", nullable: false),
                     AuditLink = table.Column<string>(type: "text", nullable: false),
-                    PurchaseEntryId = table.Column<string>(type: "text", nullable: true)
+                    PurchaseEntryId = table.Column<Guid>(type: "uuid", nullable: true)
                 },
                 constraints: table =>
                 {
@@ -510,9 +510,9 @@ namespace Girus.Infra.Database.Migrations
                 name: "KitComponents",
                 columns: table => new
                 {
-                    Id = table.Column<string>(type: "text", nullable: false),
-                    KitId = table.Column<string>(type: "text", nullable: false),
-                    ProductId = table.Column<string>(type: "text", nullable: false),
+                    Id = table.Column<Guid>(type: "uuid", nullable: false),
+                    KitId = table.Column<Guid>(type: "uuid", nullable: false),
+                    ProductId = table.Column<Guid>(type: "uuid", nullable: false),
                     Name = table.Column<string>(type: "text", nullable: false),
                     Code = table.Column<string>(type: "text", nullable: false),
                     LotNumber = table.Column<string>(type: "text", nullable: false),
@@ -537,9 +537,9 @@ namespace Girus.Infra.Database.Migrations
                 name: "PurchaseItems",
                 columns: table => new
                 {
-                    Id = table.Column<string>(type: "text", nullable: false),
-                    PurchaseEntryId = table.Column<string>(type: "text", nullable: false),
-                    ProductId = table.Column<string>(type: "text", nullable: true),
+                    Id = table.Column<Guid>(type: "uuid", nullable: false),
+                    PurchaseEntryId = table.Column<Guid>(type: "uuid", nullable: false),
+                    ProductId = table.Column<Guid>(type: "uuid", nullable: true),
                     Name = table.Column<string>(type: "text", nullable: false),
                     Code = table.Column<string>(type: "text", nullable: false),
                     Quantity = table.Column<decimal>(type: "numeric(18,3)", nullable: false),

@@ -1,7 +1,7 @@
 namespace Girus.Application.Catalog;
 
 public record KitComponentDto(
-    string ProductId,
+    Guid ProductId,
     string Name,
     string Code,
     string LotNumber,
@@ -12,7 +12,7 @@ public record KitComponentDto(
     decimal AvailableStock);
 
 public record KitDto(
-    string Id,
+    Guid Id,
     string Code,
     string Name,
     string Tag,
@@ -30,7 +30,7 @@ public record KitDto(
     string BarcodeEan);
 
 public record SaveKitRequest(
-    string? Id,
+    Guid? Id,
     string? Name,
     string? Tag,
     string? ServeLabel,
@@ -50,5 +50,5 @@ public interface IKitService
     Task<KitDto> SaveAsync(SaveKitRequest request, CancellationToken ct);
 
     /// <summary>Exclui o kit definitivamente — nunca acontece automaticamente (ex.: ao vender), só por ação explícita do usuário.</summary>
-    Task DeleteAsync(string id, CancellationToken ct);
+    Task DeleteAsync(Guid id, CancellationToken ct);
 }

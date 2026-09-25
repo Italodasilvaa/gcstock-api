@@ -14,10 +14,10 @@ public static class CatalogEndpoints
         products.MapPost("/", async (SaveProductRequest request, IProductService service, CancellationToken ct) =>
             Results.Created("/api/v1/produtos", await service.SaveAsync(request, ct)));
 
-        products.MapPut("/{id}", async (string id, SaveProductRequest request, IProductService service, CancellationToken ct) =>
+        products.MapPut("/{id:guid}", async (Guid id, SaveProductRequest request, IProductService service, CancellationToken ct) =>
             Results.Ok(await service.SaveAsync(request with { Id = id }, ct)));
 
-        products.MapDelete("/{id}", async (string id, IProductService service, CancellationToken ct) =>
+        products.MapDelete("/{id:guid}", async (Guid id, IProductService service, CancellationToken ct) =>
         {
             await service.DeleteAsync(id, ct);
             return Results.NoContent();
@@ -44,7 +44,7 @@ public static class CatalogEndpoints
         categories.MapPut("/ordem", async (ReorderCategoriesRequest request, ICategoryService service, CancellationToken ct) =>
             Results.Ok(await service.ReorderAsync(request, ct)));
 
-        categories.MapPut("/{id}", async (string id, SaveCategoryRequest request, ICategoryService service, CancellationToken ct) =>
+        categories.MapPut("/{id:guid}", async (Guid id, SaveCategoryRequest request, ICategoryService service, CancellationToken ct) =>
         {
             try
             {
@@ -57,7 +57,7 @@ public static class CatalogEndpoints
             }
         });
 
-        categories.MapDelete("/{id}", async (string id, ICategoryService service, CancellationToken ct) =>
+        categories.MapDelete("/{id:guid}", async (Guid id, ICategoryService service, CancellationToken ct) =>
         {
             try
             {
@@ -77,10 +77,10 @@ public static class CatalogEndpoints
         kits.MapPost("/", async (SaveKitRequest request, IKitService service, CancellationToken ct) =>
             Results.Created("/api/v1/kits-churrasco", await service.SaveAsync(request, ct)));
 
-        kits.MapPut("/{id}", async (string id, SaveKitRequest request, IKitService service, CancellationToken ct) =>
+        kits.MapPut("/{id:guid}", async (Guid id, SaveKitRequest request, IKitService service, CancellationToken ct) =>
             Results.Ok(await service.SaveAsync(request with { Id = id }, ct)));
 
-        kits.MapDelete("/{id}", async (string id, IKitService service, CancellationToken ct) =>
+        kits.MapDelete("/{id:guid}", async (Guid id, IKitService service, CancellationToken ct) =>
         {
             await service.DeleteAsync(id, ct);
             return Results.NoContent();

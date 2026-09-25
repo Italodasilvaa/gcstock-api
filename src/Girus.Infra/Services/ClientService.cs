@@ -19,7 +19,7 @@ public class ClientService(GirusDbContext db, ICurrentUserContext currentUser, I
 
     public async Task<ClientDto> SaveAsync(SaveClientRequest request, CancellationToken ct)
     {
-        if (!string.IsNullOrEmpty(request.Id))
+        if (request.Id.HasValue)
         {
             var existing = await db.Clients.FirstOrDefaultAsync(c => c.Id == request.Id && c.CompanyId == currentUser.CompanyId, ct);
             if (existing is not null)

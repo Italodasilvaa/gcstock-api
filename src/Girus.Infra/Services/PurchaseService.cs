@@ -92,7 +92,7 @@ public class PurchaseService(GirusDbContext db, ICurrentUserContext currentUser,
         return ToDto(saved);
     }
 
-    public async Task<PurchaseEntryDto?> UpdateAsync(string id, SavePurchaseRequest request, CancellationToken ct)
+    public async Task<PurchaseEntryDto?> UpdateAsync(Guid id, SavePurchaseRequest request, CancellationToken ct)
     {
         var existing = await db.PurchaseEntries
             .Include(p => p.Items)
@@ -108,9 +108,9 @@ public class PurchaseService(GirusDbContext db, ICurrentUserContext currentUser,
         // Produtos afetados tanto pelos itens antigos (a reverter) quanto pelos novos (a aplicar) — a
         // validade "mais próxima" de todos eles precisa ser recalculada no final, mesmo os que saíram da lista.
         var touchedProductIds = existing.Items
-            .Where(i => !string.IsNullOrEmpty(i.ProductId))
-            .Select(i => i.ProductId!)
-            .Concat(newItems.Where(i => !string.IsNullOrEmpty(i.ProductId)).Select(i => i.ProductId!))
+            .Where(i => i.ProductId.HasValue)
+            .Select(i => i.ProductId!.Value)
+            .Concat(newItems.Where(i => i.ProductId.HasValue).Select(i => i.ProductId!.Value))
             .Distinct()
             .ToList();
         var products = touchedProductIds.Count > 0
@@ -120,7 +120,7 @@ public class PurchaseService(GirusDbContext db, ICurrentUserContext currentUser,
         // Reverte o efeito da versão antiga: desfaz a soma de estoque e remove lote/movimentação desta compra.
         foreach (var oldItem in existing.Items)
         {
-            if (!string.IsNullOrEmpty(oldItem.ProductId) && products.TryGetValue(oldItem.ProductId, out var product))
+            if (oldItem.ProductId.HasValue && products.TryGetValue(oldItem.ProductId.Value, out var product))
             {
                 product.Stock -= oldItem.Quantity;
             }
@@ -200,21 +200,21 @@ public class PurchaseService(GirusDbContext db, ICurrentUserContext currentUser,
         PurchaseEntry entry,
         List<PurchaseItemDto> items,
         CancellationToken ct,
-        Dictionary<string, Product>? preloadedProducts = null,
-        List<string>? extraProductIdsToRecompute = null)
+        Dictionary<Guid, Product>? preloadedProducts = null,
+        List<Guid>? extraProductIdsToRecompute = null)
     {
         var now = DateTime.UtcNow;
-        var productIds = items.Where(i => !string.IsNullOrEmpty(i.ProductId)).Select(i => i.ProductId!).Distinct().ToList();
+        var productIds = items.Where(i => i.ProductId.HasValue).Select(i => i.ProductId!.Value).Distinct().ToList();
 
         var products = preloadedProducts ?? (productIds.Count > 0
             ? await db.Products.Where(p => p.CompanyId == currentUser.CompanyId && productIds.Contains(p.Id)).ToDictionaryAsync(p => p.Id, ct)
             : []);
 
-        var newBatchesByProduct = new Dictionary<string, List<StockBatch>>();
+        var newBatchesByProduct = new Dictionary<Guid, List<StockBatch>>();
 
         foreach (var item in items)
         {
-            if (string.IsNullOrEmpty(item.ProductId) || !products.TryGetValue(item.ProductId, out var product))
+            if (!item.ProductId.HasValue || !products.TryGetValue(item.ProductId.Value, out var product))
             {
                 continue;
             }

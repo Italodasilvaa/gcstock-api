@@ -14,7 +14,7 @@ public static class FinanceEndpoints
         group.MapPost("/contas-a-pagar", async (AddPayableRequest request, IPayableService service, CancellationToken ct) =>
             Results.Created("/api/v1/financeiro/contas-a-pagar", await service.AddAsync(request, ct)));
 
-        group.MapPost("/contas-a-pagar/{id}/baixar", async (string id, SettlePayableRequest request, IPayableService service, CancellationToken ct) =>
+        group.MapPost("/contas-a-pagar/{id:guid}/baixar", async (Guid id, SettlePayableRequest request, IPayableService service, CancellationToken ct) =>
         {
             var settled = await service.SettleAsync(id, request, ct);
             return settled is not null ? Results.Ok(settled) : Results.NotFound();
@@ -26,7 +26,7 @@ public static class FinanceEndpoints
         group.MapPost("/clientes-a-receber", async (AddReceivableRequest request, IReceivableService service, CancellationToken ct) =>
             Results.Created("/api/v1/financeiro/clientes-a-receber", await service.AddAsync(request, ct)));
 
-        group.MapPost("/clientes-a-receber/{id}/liquidar", async (string id, IReceivableService service, CancellationToken ct) =>
+        group.MapPost("/clientes-a-receber/{id:guid}/liquidar", async (Guid id, IReceivableService service, CancellationToken ct) =>
         {
             var settled = await service.SettleAsync(id, ct);
             return settled is not null ? Results.Ok(settled) : Results.NotFound();
@@ -35,7 +35,7 @@ public static class FinanceEndpoints
         group.MapGet("/liquidacoes-cartao", async (ICardSettlementService service, CancellationToken ct) =>
             Results.Ok(await service.GetAllAsync(ct)));
 
-        group.MapPost("/liquidacoes-cartao/{id}/antecipar", async (string id, ICardSettlementService service, CancellationToken ct) =>
+        group.MapPost("/liquidacoes-cartao/{id:guid}/antecipar", async (Guid id, ICardSettlementService service, CancellationToken ct) =>
         {
             await service.AnticipateAsync(id, ct);
             return Results.Ok();

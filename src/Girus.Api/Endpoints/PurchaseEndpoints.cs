@@ -14,7 +14,7 @@ public static class PurchaseEndpoints
         group.MapPost("/entrada", async (SavePurchaseRequest request, IPurchaseService service, CancellationToken ct) =>
             Results.Created("/api/v1/compras", await service.SaveAsync(request, ct)));
 
-        group.MapPut("/{id}", async (string id, SavePurchaseRequest request, IPurchaseService service, CancellationToken ct) =>
+        group.MapPut("/{id:guid}", async (Guid id, SavePurchaseRequest request, IPurchaseService service, CancellationToken ct) =>
         {
             try
             {

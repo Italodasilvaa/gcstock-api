@@ -19,7 +19,7 @@ public class ProductService(GirusDbContext db, ICurrentUserContext currentUser, 
 
     public async Task<ProductDto> SaveAsync(SaveProductRequest request, CancellationToken ct)
     {
-        if (!string.IsNullOrEmpty(request.Id))
+        if (request.Id.HasValue)
         {
             var existing = await db.Products.FirstOrDefaultAsync(p => p.Id == request.Id && p.CompanyId == currentUser.CompanyId, ct);
             if (existing is not null)
@@ -69,10 +69,12 @@ public class ProductService(GirusDbContext db, ICurrentUserContext currentUser, 
             IsPerishable = request.IsPerishable ?? true,
             AlertDays = request.AlertDays ?? 3,
             StorageTemp = request.StorageTemp ?? "-2°C a 2°C",
-            NearestExpiry = request.NearestExpiry ?? DateOnly.FromDateTime(DateTime.UtcNow.AddDays(30)),
-            ExpiryDaysRemaining = request.ExpiryDaysRemaining ?? 30,
-            ExpiryStatus = request.ExpiryStatus ?? "normal",
-            LotNumber = request.LotNumber ?? "LT-" + rnd.Next(100, 1000),
+            // Sem validade informada: mesmo estado de "produto sem lote" usado pelo PurchaseService.
+            // A validade real passa a vir dos lotes lançados em Compras.
+            NearestExpiry = request.NearestExpiry ?? DateOnly.FromDateTime(DateTime.UtcNow).AddYears(1),
+            ExpiryDaysRemaining = request.ExpiryDaysRemaining ?? 365,
+            ExpiryStatus = request.ExpiryStatus ?? "longo",
+            LotNumber = request.LotNumber ?? string.Empty,
             Supplier = request.Supplier ?? "Minerva Foods S.A.",
             ImageUrl = request.ImageUrl ?? string.Empty,
             SubLocation = request.SubLocation,
@@ -85,7 +87,7 @@ public class ProductService(GirusDbContext db, ICurrentUserContext currentUser, 
         return ToDto(saved);
     }
 
-    public async Task DeleteAsync(string id, CancellationToken ct)
+    public async Task DeleteAsync(Guid id, CancellationToken ct)
     {
         var target = await db.Products.FirstOrDefaultAsync(p => p.Id == id && p.CompanyId == currentUser.CompanyId, ct);
         if (target is null) return;

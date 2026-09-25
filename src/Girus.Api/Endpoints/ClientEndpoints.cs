@@ -14,7 +14,7 @@ public static class ClientEndpoints
         group.MapPost("/", async (SaveClientRequest request, IClientService service, CancellationToken ct) =>
             Results.Created("/api/v1/clientes", await service.SaveAsync(request, ct)));
 
-        group.MapPut("/{id}", async (string id, SaveClientRequest request, IClientService service, CancellationToken ct) =>
+        group.MapPut("/{id:guid}", async (Guid id, SaveClientRequest request, IClientService service, CancellationToken ct) =>
             Results.Ok(await service.SaveAsync(request with { Id = id }, ct)));
     }
 }

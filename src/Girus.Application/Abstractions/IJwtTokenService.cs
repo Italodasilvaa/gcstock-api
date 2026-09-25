@@ -1,13 +1,13 @@
 namespace Girus.Application.Abstractions;
 
 public record JwtIssueRequest(
-    string UserId,
+    Guid UserId,
     string UserName,
     string UserEmail,
     string Role,
-    string CompanyId,
-    string? AdministratorId,
-    string? EmployeeId);
+    Guid CompanyId,
+    Guid? AdministratorId,
+    Guid? EmployeeId);
 
 public interface IJwtTokenService
 {

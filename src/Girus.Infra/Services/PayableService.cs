@@ -43,7 +43,7 @@ public class PayableService(GirusDbContext db, ICurrentUserContext currentUser, 
         return ToDto(saved);
     }
 
-    public async Task<AccountsPayableDto?> SettleAsync(string id, SettlePayableRequest request, CancellationToken ct)
+    public async Task<AccountsPayableDto?> SettleAsync(Guid id, SettlePayableRequest request, CancellationToken ct)
     {
         var item = await db.AccountsPayables.FirstOrDefaultAsync(p => p.Id == id && p.CompanyId == currentUser.CompanyId, ct);
         if (item is null) return null;
@@ -54,7 +54,7 @@ public class PayableService(GirusDbContext db, ICurrentUserContext currentUser, 
         item.DueLabel = $"Pago em {today:dd/MM/yyyy}";
         item.ReceiptAttached = true;
 
-        if (!string.IsNullOrEmpty(item.PurchaseEntryId))
+        if (item.PurchaseEntryId.HasValue)
         {
             var purchase = await db.PurchaseEntries
                 .FirstOrDefaultAsync(p => p.Id == item.PurchaseEntryId && p.CompanyId == currentUser.CompanyId, ct);

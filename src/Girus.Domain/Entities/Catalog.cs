@@ -3,8 +3,8 @@ namespace Girus.Domain.Entities;
 /// <summary>Unit: "kg" | "un" | "pct" | "cx". ExpiryStatus: "vencido" | "critico" | "normal" | "longo".</summary>
 public class Product
 {
-    public string Id { get; set; } = "prod_" + Guid.NewGuid().ToString("N");
-    public string CompanyId { get; set; } = string.Empty;
+    public Guid Id { get; set; } = Guid.CreateVersion7();
+    public Guid CompanyId { get; set; }
     public Company? Company { get; set; }
 
     public string Sku { get; set; } = string.Empty;
@@ -33,8 +33,8 @@ public class Product
 /// <summary>Categoria de produto da empresa. Product.Category guarda o Name (texto), então renomear aqui propaga para os produtos.</summary>
 public class ProductCategory
 {
-    public string Id { get; set; } = "cat_" + Guid.NewGuid().ToString("N");
-    public string CompanyId { get; set; } = string.Empty;
+    public Guid Id { get; set; } = Guid.CreateVersion7();
+    public Guid CompanyId { get; set; }
     public Company? Company { get; set; }
 
     public string Name { get; set; } = string.Empty;
@@ -45,8 +45,8 @@ public class ProductCategory
 /// <summary>StockStatus: "amplo" | "disponivel" | "alerta".</summary>
 public class Kit
 {
-    public string Id { get; set; } = "kit_" + Guid.NewGuid().ToString("N");
-    public string CompanyId { get; set; } = string.Empty;
+    public Guid Id { get; set; } = Guid.CreateVersion7();
+    public Guid CompanyId { get; set; }
     public Company? Company { get; set; }
 
     public string Code { get; set; } = string.Empty;
@@ -69,11 +69,11 @@ public class Kit
 
 public class KitComponent
 {
-    public string Id { get; set; } = "kitcomp_" + Guid.NewGuid().ToString("N");
-    public string KitId { get; set; } = string.Empty;
+    public Guid Id { get; set; } = Guid.CreateVersion7();
+    public Guid KitId { get; set; }
     public Kit? Kit { get; set; }
 
-    public string ProductId { get; set; } = string.Empty;
+    public Guid ProductId { get; set; }
     public string Name { get; set; } = string.Empty;
     public string Code { get; set; } = string.Empty;
     public string LotNumber { get; set; } = string.Empty;

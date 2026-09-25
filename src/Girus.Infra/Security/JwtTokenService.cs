@@ -17,22 +17,22 @@ public class JwtTokenService(IOptions<JwtSettings> options) : IJwtTokenService
 
         var claims = new List<Claim>
         {
-            new(JwtRegisteredClaimNames.Sub, request.UserId),
+            new(JwtRegisteredClaimNames.Sub, request.UserId.ToString()),
             new(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
             new(ClaimTypes.Name, request.UserName),
             new(ClaimTypes.Email, request.UserEmail),
             new(ClaimTypes.Role, request.Role),
-            new(ClaimTypesGirus.CompanyId, request.CompanyId),
+            new(ClaimTypesGirus.CompanyId, request.CompanyId.ToString()),
         };
 
-        if (!string.IsNullOrEmpty(request.AdministratorId))
+        if (request.AdministratorId.HasValue)
         {
-            claims.Add(new Claim(ClaimTypesGirus.AdministratorId, request.AdministratorId));
+            claims.Add(new Claim(ClaimTypesGirus.AdministratorId, request.AdministratorId.Value.ToString()));
         }
 
-        if (!string.IsNullOrEmpty(request.EmployeeId))
+        if (request.EmployeeId.HasValue)
         {
-            claims.Add(new Claim(ClaimTypesGirus.EmployeeId, request.EmployeeId));
+            claims.Add(new Claim(ClaimTypesGirus.EmployeeId, request.EmployeeId.Value.ToString()));
         }
 
         var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_settings.SecretKey));

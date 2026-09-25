@@ -14,16 +14,16 @@ public static class EmployeeEndpoints
         group.MapPost("/", async (SaveEmployeeRequest request, IEmployeeService service, CancellationToken ct) =>
             Results.Created($"/api/v1/funcionarios", await service.SaveAsync(request, ct)));
 
-        group.MapPut("/{id}", async (string id, SaveEmployeeRequest request, IEmployeeService service, CancellationToken ct) =>
+        group.MapPut("/{id:guid}", async (Guid id, SaveEmployeeRequest request, IEmployeeService service, CancellationToken ct) =>
             Results.Ok(await service.SaveAsync(request with { Id = id }, ct)));
 
-        group.MapDelete("/{id}", async (string id, IEmployeeService service, CancellationToken ct) =>
+        group.MapDelete("/{id:guid}", async (Guid id, IEmployeeService service, CancellationToken ct) =>
         {
             await service.DeleteAsync(id, ct);
             return Results.NoContent();
         });
 
-        group.MapPost("/{id}/transferir", async (string id, TransferEmployeeRequest request, IEmployeeService service, CancellationToken ct) =>
+        group.MapPost("/{id:guid}/transferir", async (Guid id, TransferEmployeeRequest request, IEmployeeService service, CancellationToken ct) =>
         {
             var updated = await service.TransferAsync(id, request.TargetCompanyId, ct);
             return updated is not null ? Results.Ok(updated) : Results.BadRequest(new { message = "Transferência não permitida." });
@@ -31,4 +31,4 @@ public static class EmployeeEndpoints
     }
 }
 
-public record TransferEmployeeRequest(string TargetCompanyId);
+public record TransferEmployeeRequest(Guid TargetCompanyId);

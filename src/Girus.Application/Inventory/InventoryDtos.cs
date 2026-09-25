@@ -1,8 +1,8 @@
 namespace Girus.Application.Inventory;
 
 public record StockBatchDto(
-    string Id,
-    string ProductId,
+    Guid Id,
+    Guid ProductId,
     string ProductName,
     string Sku,
     string LotNumber,
@@ -15,7 +15,7 @@ public record StockBatchDto(
     string Status);
 
 public record StockMovementDto(
-    string Id,
+    Guid Id,
     DateTime Timestamp,
     string Type,
     string Title,

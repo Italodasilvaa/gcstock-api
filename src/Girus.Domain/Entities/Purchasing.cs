@@ -3,8 +3,8 @@ namespace Girus.Domain.Entities;
 /// <summary>PaymentStatus: "pago" | "pendente". PaymentMode: "pix" | "dinheiro" | "cartao" | "a_prazo".</summary>
 public class PurchaseEntry
 {
-    public string Id { get; set; } = "pur_" + Guid.NewGuid().ToString("N");
-    public string CompanyId { get; set; } = string.Empty;
+    public Guid Id { get; set; } = Guid.CreateVersion7();
+    public Guid CompanyId { get; set; }
     public Company? Company { get; set; }
 
     public string OrderCode { get; set; } = string.Empty;
@@ -29,12 +29,12 @@ public class PurchaseEntry
 
 public class PurchaseItem
 {
-    public string Id { get; set; } = "puritem_" + Guid.NewGuid().ToString("N");
-    public string PurchaseEntryId { get; set; } = string.Empty;
+    public Guid Id { get; set; } = Guid.CreateVersion7();
+    public Guid PurchaseEntryId { get; set; }
     public PurchaseEntry? PurchaseEntry { get; set; }
 
     /// <summary>Produto do catálogo (Girus.Domain.Entities.Product) ao qual esta entrada deve somar estoque. Nulo = item avulso, sem baixa automática.</summary>
-    public string? ProductId { get; set; }
+    public Guid? ProductId { get; set; }
     public string Name { get; set; } = string.Empty;
     public string Code { get; set; } = string.Empty;
     public decimal Quantity { get; set; }

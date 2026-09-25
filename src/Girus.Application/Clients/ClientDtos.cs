@@ -1,7 +1,7 @@
 namespace Girus.Application.Clients;
 
 public record ClientDto(
-    string Id,
+    Guid Id,
     string Name,
     string Document,
     string Phone,
@@ -14,7 +14,7 @@ public record ClientDto(
     string? Notes);
 
 public record SaveClientRequest(
-    string? Id,
+    Guid? Id,
     string? Name,
     string? Document,
     string? Phone,

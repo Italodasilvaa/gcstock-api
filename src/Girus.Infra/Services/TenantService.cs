@@ -30,7 +30,7 @@ public class TenantService(
         return result;
     }
 
-    public async Task<AuthSessionDto?> SwitchCompanyAsync(string companyId, CancellationToken ct)
+    public async Task<AuthSessionDto?> SwitchCompanyAsync(Guid companyId, CancellationToken ct)
     {
         // Só é permitida entre empresas do mesmo Administrator (mesmo dono/grupo), e só para o próprio dono
         // (funcionário não troca de empresa).

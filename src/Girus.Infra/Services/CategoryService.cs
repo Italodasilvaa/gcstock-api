@@ -34,7 +34,7 @@ public class CategoryService(GirusDbContext db, ICurrentUserContext currentUser,
         return ToDto(category);
     }
 
-    public async Task<ProductCategoryDto?> UpdateAsync(string id, SaveCategoryRequest request, CancellationToken ct)
+    public async Task<ProductCategoryDto?> UpdateAsync(Guid id, SaveCategoryRequest request, CancellationToken ct)
     {
         var category = await db.ProductCategories.FirstOrDefaultAsync(c => c.Id == id && c.CompanyId == currentUser.CompanyId, ct);
         if (category is null) return null;
@@ -83,7 +83,7 @@ public class CategoryService(GirusDbContext db, ICurrentUserContext currentUser,
         return await QueryOrderedAsync(ct);
     }
 
-    public async Task<bool> DeleteAsync(string id, CancellationToken ct)
+    public async Task<bool> DeleteAsync(Guid id, CancellationToken ct)
     {
         var category = await db.ProductCategories.FirstOrDefaultAsync(c => c.Id == id && c.CompanyId == currentUser.CompanyId, ct);
         if (category is null) return false;
@@ -157,7 +157,7 @@ public class CategoryService(GirusDbContext db, ICurrentUserContext currentUser,
             .Select(c => new ProductCategoryDto(c.Id, c.Name, c.Icon, c.SortOrder))
             .ToListAsync(ct);
 
-    private Task<bool> NameExistsAsync(string name, string? exceptId, CancellationToken ct) =>
+    private Task<bool> NameExistsAsync(string name, Guid? exceptId, CancellationToken ct) =>
         db.ProductCategories.AnyAsync(
             c => c.CompanyId == currentUser.CompanyId && c.Name == name && (exceptId == null || c.Id != exceptId), ct);
 

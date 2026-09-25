@@ -1,7 +1,7 @@
 namespace Girus.Application.Catalog;
 
 public record ProductDto(
-    string Id,
+    Guid Id,
     string Sku,
     string Code,
     string Ean,
@@ -25,7 +25,7 @@ public record ProductDto(
     bool? IsPromo);
 
 public record SaveProductRequest(
-    string? Id,
+    Guid? Id,
     string? Sku,
     string? Ean,
     string? Name,
@@ -51,5 +51,5 @@ public interface IProductService
 {
     Task<List<ProductDto>> GetAllAsync(CancellationToken ct);
     Task<ProductDto> SaveAsync(SaveProductRequest request, CancellationToken ct);
-    Task DeleteAsync(string id, CancellationToken ct);
+    Task DeleteAsync(Guid id, CancellationToken ct);
 }

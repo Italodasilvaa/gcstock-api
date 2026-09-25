@@ -1,7 +1,7 @@
 namespace Girus.Application.Finance;
 
 public record AccountsReceivableDto(
-    string Id,
+    Guid Id,
     string ClientOrOrigin,
     string SubCategory,
     string Reference,
@@ -31,5 +31,5 @@ public interface IReceivableService
 {
     Task<List<AccountsReceivableDto>> GetAllAsync(CancellationToken ct);
     Task<AccountsReceivableDto> AddAsync(AddReceivableRequest request, CancellationToken ct);
-    Task<AccountsReceivableDto?> SettleAsync(string id, CancellationToken ct);
+    Task<AccountsReceivableDto?> SettleAsync(Guid id, CancellationToken ct);
 }

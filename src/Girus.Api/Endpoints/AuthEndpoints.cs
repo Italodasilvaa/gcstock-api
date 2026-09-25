@@ -43,7 +43,7 @@ public static class AuthEndpoints
         // Conveniência de "acesso rápido" da tela de login (ambiente de demonstração).
         // Expõe o e-mail do dono de uma empresa sem autenticação — recomenda-se remover
         // ou proteger este endpoint antes de qualquer uso em produção real.
-        group.MapGet("/companies/{companyId}/quick-login-email", async (string companyId, IAuthService service, CancellationToken ct) =>
+        group.MapGet("/companies/{companyId:guid}/quick-login-email", async (Guid companyId, IAuthService service, CancellationToken ct) =>
         {
             var email = await service.GetCompanyOwnerEmailAsync(companyId, ct);
             return email is not null ? Results.Ok(new { email }) : Results.NotFound();

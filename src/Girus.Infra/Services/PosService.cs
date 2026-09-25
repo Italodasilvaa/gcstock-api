@@ -14,7 +14,7 @@ public class PosService(GirusDbContext db, ICurrentUserContext currentUser, IAud
     public async Task<FinalizeSaleResult> FinalizeSaleAsync(FinalizeSaleRequest request, CancellationToken ct)
     {
         var rnd = Random.Shared;
-        var saleId = "SALE-" + rnd.Next(1000, 10000);
+        var saleId = Guid.CreateVersion7();
         var receiptNumber = "NFCe-" + rnd.Next(100000, 1000000);
         var now = DateTime.UtcNow;
 
@@ -24,7 +24,7 @@ public class PosService(GirusDbContext db, ICurrentUserContext currentUser, IAud
             CompanyId = currentUser.CompanyId,
             Timestamp = now,
             Type = "baixa_pdv",
-            Title = $"Venda {saleId} ({request.PaymentMode})",
+            Title = $"Venda {receiptNumber} ({request.PaymentMode})",
             DocInfo = $"Tíquete Balcão 01 • {request.Total.ToString("C", new CultureInfo("pt-BR"))}",
             AmountKg = -totalKg,
             Description = $"Baixa realizada no PDV: {string.Join(", ", request.Items.Select(i => $"{i.Qty}x {i.Name}"))}",
@@ -34,25 +34,25 @@ public class PosService(GirusDbContext db, ICurrentUserContext currentUser, IAud
 
         // Baixa automática de estoque: produto avulso desconta ele mesmo; kit desconta cada componente
         // proporcionalmente à quantidade de kits vendidos.
-        var productIds = request.Items.Where(i => !string.IsNullOrEmpty(i.ProductId)).Select(i => i.ProductId!).Distinct().ToList();
-        var kitIds = request.Items.Where(i => !string.IsNullOrEmpty(i.KitId)).Select(i => i.KitId!).Distinct().ToList();
+        var productIds = request.Items.Where(i => i.ProductId.HasValue).Select(i => i.ProductId!.Value).Distinct().ToList();
+        var kitIds = request.Items.Where(i => i.KitId.HasValue).Select(i => i.KitId!.Value).Distinct().ToList();
 
         var products = productIds.Count > 0
             ? await db.Products.Where(p => p.CompanyId == currentUser.CompanyId && productIds.Contains(p.Id)).ToDictionaryAsync(p => p.Id, ct)
-            : new Dictionary<string, Product>();
+            : new Dictionary<Guid, Product>();
         var kits = kitIds.Count > 0
             ? await db.Kits.Include(k => k.Components).Where(k => k.CompanyId == currentUser.CompanyId && kitIds.Contains(k.Id)).ToDictionaryAsync(k => k.Id, ct)
-            : new Dictionary<string, Kit>();
+            : new Dictionary<Guid, Kit>();
 
         foreach (var item in request.Items)
         {
-            if (!string.IsNullOrEmpty(item.ProductId) && products.TryGetValue(item.ProductId, out var product))
+            if (item.ProductId.HasValue && products.TryGetValue(item.ProductId.Value, out var product))
             {
                 product.Stock -= item.Qty;
                 continue;
             }
 
-            if (!string.IsNullOrEmpty(item.KitId) && kits.TryGetValue(item.KitId, out var kit))
+            if (item.KitId.HasValue && kits.TryGetValue(item.KitId.Value, out var kit))
             {
                 kit.StockAvailable = Math.Max(0, kit.StockAvailable - item.Qty);
                 foreach (var component in kit.Components)
@@ -82,7 +82,7 @@ public class PosService(GirusDbContext db, ICurrentUserContext currentUser, IAud
                 CompanyId = currentUser.CompanyId,
                 ClientOrOrigin = $"Adquirente {request.CardFlag ?? "Mastercard"} - PDV Balcão 01",
                 SubCategory = "Venda Crédito à Vista (TEF Balcão)",
-                Reference = saleId,
+                Reference = receiptNumber,
                 DueDate = dueDate,
                 DueLabel = "Em 30 dias",
                 GrossAmount = request.Total,
@@ -103,7 +103,7 @@ public class PosService(GirusDbContext db, ICurrentUserContext currentUser, IAud
                 CompanyId = currentUser.CompanyId,
                 ClientOrOrigin = request.ClientName ?? "Cliente Avulso (A Prazo)",
                 SubCategory = "Venda a Prazo • PDV Balcão 01",
-                Reference = saleId,
+                Reference = receiptNumber,
                 DueDate = dueDate,
                 DueLabel = DateLabelHelper.DueLabelFor(dueDate),
                 GrossAmount = request.Total,
@@ -115,7 +115,7 @@ public class PosService(GirusDbContext db, ICurrentUserContext currentUser, IAud
                 ClientId = request.ClientId,
             });
 
-            if (!string.IsNullOrEmpty(request.ClientId))
+            if (request.ClientId.HasValue)
             {
                 var client = await db.Clients.FirstOrDefaultAsync(c => c.Id == request.ClientId, ct);
                 if (client is not null)
@@ -141,7 +141,7 @@ public class PosService(GirusDbContext db, ICurrentUserContext currentUser, IAud
         await db.SaveChangesAsync(ct);
         await audit.RecordAsync(
             "vendeu", "Venda PDV",
-            $"{saleId} • {request.Total.ToString("C", new CultureInfo("pt-BR"))}",
+            $"{receiptNumber} • {request.Total.ToString("C", new CultureInfo("pt-BR"))}",
             request.ClientName ?? request.PaymentMode, ct);
 
         return new FinalizeSaleResult(saleId, receiptNumber);

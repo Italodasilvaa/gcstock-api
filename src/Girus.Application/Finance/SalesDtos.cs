@@ -1,8 +1,8 @@
 namespace Girus.Application.Finance;
 
 public record SaleRecordDto(
-    string Id,
-    string SaleId,
+    Guid Id,
+    Guid SaleId,
     DateTime Timestamp,
     decimal Total,
     decimal NetAmount,

@@ -20,7 +20,7 @@ public class KitService(GirusDbContext db, ICurrentUserContext currentUser, IAud
 
     public async Task<KitDto> SaveAsync(SaveKitRequest request, CancellationToken ct)
     {
-        if (!string.IsNullOrEmpty(request.Id))
+        if (request.Id.HasValue)
         {
             var existing = await db.Kits
                 .Include(k => k.Components)
@@ -76,7 +76,7 @@ public class KitService(GirusDbContext db, ICurrentUserContext currentUser, IAud
         return ToDto(saved);
     }
 
-    public async Task DeleteAsync(string id, CancellationToken ct)
+    public async Task DeleteAsync(Guid id, CancellationToken ct)
     {
         var target = await db.Kits.FirstOrDefaultAsync(k => k.Id == id && k.CompanyId == currentUser.CompanyId, ct);
         if (target is null) return;
