@@ -8,11 +8,13 @@ using GCStock.Application.Finance;
 using GCStock.Application.Inventory;
 using GCStock.Application.Pdv;
 using GCStock.Application.Purchasing;
+using GCStock.Application.Storage;
 using GCStock.Application.Tenants;
 using GCStock.Infra.Database;
 using GCStock.Infra.HealthChecks;
 using GCStock.Infra.Security;
 using GCStock.Infra.Services;
+using GCStock.Infra.Storage;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -61,6 +63,9 @@ public static class InfraServiceCollectionExtensions
 
         services.AddScoped<IPosService, PosService>();
         services.AddScoped<IClientService, ClientService>();
+
+        services.Configure<R2Settings>(configuration.GetSection(R2Settings.SectionName));
+        services.AddSingleton<IFileStorage, R2FileStorage>();
 
         return services;
     }

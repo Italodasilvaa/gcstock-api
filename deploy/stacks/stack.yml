@@ -19,6 +19,10 @@ services:
         target: ConnectionStrings__DefaultConnection
       - source: gcstock_jwt_secret
         target: Jwt__SecretKey
+      - source: gcstock_r2_access_key_id
+        target: Storage__R2__AccessKeyId
+      - source: gcstock_r2_secret_access_key
+        target: Storage__R2__SecretAccessKey
     networks:
       - public    # Traefik
       - backend   # Postgres (host interno: postgres)
@@ -68,6 +72,12 @@ secrets:
   gcstock_jwt_secret:
     external: true
     name: __SERVICE_NAME__-jwt-secret
+  gcstock_r2_access_key_id:
+    external: true
+    name: __SERVICE_NAME__-r2-access-key-id
+  gcstock_r2_secret_access_key:
+    external: true
+    name: __SERVICE_NAME__-r2-secret-access-key
 
 networks:
   public:

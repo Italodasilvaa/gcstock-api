@@ -219,6 +219,13 @@ Etapas do pipeline:
 3. Geração do `stack.yml` com os placeholders substituídos.
 4. Deploy via `docker stack deploy` no ambiente correspondente.
 
+
+## Armazenamento de arquivos (Cloudflare R2)
+
+Imagens, vídeos e documentos vão para o Cloudflare R2 (um bucket por ambiente: `gcstock-nprd` e `gcstock-prd`); o banco
+guarda apenas a URL (ex.: `ImageUrl` de produtos e kits). Endpoints em `/api/v1/arquivos` (upload multipart, URL
+pré-assinada para upload direto e remoção). Configuração, credenciais e CORS do bucket: `deploy/VPS.md`, seção 6.
+
 ## Monitoramento
 
 - Liveness/Readiness via `/health/live` e `/health/ready` (consumíveis por probes de orquestradores e Traefik).

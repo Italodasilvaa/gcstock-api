@@ -154,6 +154,7 @@ app.MapConfiguracoesEndpoints();
 app.MapPdvEndpoints();
 app.MapClientEndpoints();
 app.MapAuditEndpoints();
+app.MapFileEndpoints();
 
 app.Run();
 

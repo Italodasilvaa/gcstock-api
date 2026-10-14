@@ -72,3 +72,65 @@ docker stack deploy --with-registry-auth -c stack.prd.yml gcstock-prd
 ```
 
 Conferir: `docker service ls`, `curl https://api.iwsolutions.cloud/health`.
+
+## 6. Armazenamento de arquivos (Cloudflare R2)
+
+Imagens, vídeos e documentos enviados pelo sistema ficam no R2, em um bucket por ambiente. O banco guarda só a URL.
+
+### 6.1 Na Cloudflare (Dashboard > R2 Object Storage)
+
+1. Ative o R2 na conta (se ainda não estiver) e anote o **Account ID** (Overview, lado direito).
+2. Crie dois buckets: `gcstock-nprd` e `gcstock-prd`.
+3. **Leitura pública** (para as `<img>` e `<video>` do sistema): em cada bucket, Settings > **Custom Domains** > adicione
+   `cdn-nprd.iwsolutions.cloud` (bucket nprd) e `cdn.iwsolutions.cloud` (bucket prd). A Cloudflare cria o DNS sozinha.
+   (Evite o domínio `r2.dev`: é limitado e só serve para testes.)
+4. **CORS** (necessário só para o upload direto do navegador, `/url-upload`): em cada bucket, Settings > CORS policy:
+
+   ```json
+   [
+     {
+       "AllowedOrigins": ["https://app.iwsolutions.cloud", "http://localhost:4200"],
+       "AllowedMethods": ["PUT", "GET", "HEAD"],
+       "AllowedHeaders": ["Content-Type"],
+       "MaxAgeSeconds": 3600
+     }
+   ]
+   ```
+
+   Ajuste `AllowedOrigins` para o domínio real do front (no bucket prd, não deixe `localhost`).
+5. **API token**: R2 > Manage API Tokens > Create. Permissão **Object Read & Write**, restrita ao bucket. Crie um token para
+   cada ambiente. Guarde o **Access Key ID** e o **Secret Access Key** (o secret aparece uma única vez).
+
+### 6.2 Configuração da API
+
+`appsettings.json` (nprd) e `appsettings.Production.json` (prd) já trazem o Account ID, o nome do bucket e o domínio público. Para mudar:
+`Storage:R2:AccountId` (só no `appsettings.json`) e o `Storage:R2:PublicBaseUrl` (`https://cdn-nprd.iwsolutions.cloud` / `https://cdn.iwsolutions.cloud`).
+Sem isso a API sobe normalmente, mas os endpoints de upload respondem **503**.
+
+Credenciais, desenvolvimento local (nprd):
+
+```bash
+dotnet user-secrets set "Storage:R2:AccessKeyId" "<ACCESS_KEY_ID_NPRD>" --project src/GCStock.Api
+dotnet user-secrets set "Storage:R2:SecretAccessKey" "<SECRET_NPRD>" --project src/GCStock.Api
+```
+
+Credenciais, servidor (Swarm secrets lidos pela stack):
+
+```bash
+printf '<ACCESS_KEY_ID_PRD>' | docker secret create gcstock-prd-r2-access-key-id -
+printf '<SECRET_PRD>'        | docker secret create gcstock-prd-r2-secret-access-key -
+printf '<ACCESS_KEY_ID_NPRD>' | docker secret create gcstock-nprd-r2-access-key-id -
+printf '<SECRET_NPRD>'        | docker secret create gcstock-nprd-r2-secret-access-key -
+```
+
+### 6.3 Endpoints (autenticados, JWT)
+
+| Método | Rota | Uso |
+|--------|------|-----|
+| POST | `/api/v1/arquivos?pasta=produtos` | Upload multipart (campo `file`), até 100 MB. Retorna `{ key, url, contentType, size }`. Grave `url` em `ImageUrl`. |
+| POST | `/api/v1/arquivos/url-upload` | Corpo `{ fileName, contentType, size, folder }`. Retorna uma URL pré-assinada: o navegador faz `PUT` direto no R2 (repetindo o mesmo `Content-Type`). Use para vídeos e arquivos grandes. |
+| DELETE | `/api/v1/arquivos?key=<key>` | Remove um arquivo da própria empresa. |
+
+Regras: imagens até 10 MB; documentos (pdf, csv, txt, xlsx, docx, zip) até 25 MB; vídeos (mp4, webm, mov) até 500 MB
+(via `url-upload`; o upload pela API é limitado a 100 MB pelo proxy da Cloudflare). As chaves seguem
+`{empresaId}/{pasta}/{guid}.{ext}`, o que isola os arquivos entre empresas.
