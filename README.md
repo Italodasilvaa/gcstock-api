@@ -34,7 +34,7 @@ azure-pipelines.yml
 ## API
 
 - **Swagger**: disponível em `/swagger` (Swashbuckle.AspNetCore 7.3.1).
-- **CORS**: libera `localhost`, `valee.com.br` e subdomínios (`*.valee.com.br`).
+- **CORS**: libera `localhost`, `iwsolutions.cloud` e subdomínios (`*.iwsolutions.cloud`).
 - **Health checks**:
   - `GET /health/live` — verificação de liveness (self, não depende de infraestrutura externa).
   - `GET /health/ready` — verificação de readiness, valida o SQL Server com `SELECT 1`.
@@ -61,7 +61,7 @@ azure-pipelines.yml
 
 ## Domínio de negócio (GC Stock ERP)
 
-A API implementa, com banco real (SQL Server via EF Core) e autenticação JWT real (bcrypt + JWT), o mesmo contrato
+A API implementa, com banco real (PostgreSQL via EF Core) e autenticação JWT real (bcrypt + JWT), o mesmo contrato
 que o front-end `gcstock-ui` hoje simula localmente no `MockDataService` (multi-empresa, produtos, kits, estoque,
 compras, financeiro, PDV, clientes, funcionários e auditoria). Ver `src/GCStock.Api/Endpoints/*.cs` para o mapeamento
 completo das rotas — resumo:
@@ -99,9 +99,8 @@ Todos os dados são isolados por empresa (`companyId` extraído das claims do JW
 
 ### Banco de dados e seed
 
-- O `ConnectionStrings:DefaultConnection` padrão foi ajustado para apontar para um banco dedicado (`GCStockDb`) no
-  mesmo servidor de dev/homologação já configurado no projeto, em vez de `dbValee-Refactor` — evitando colidir com
-  as tabelas de outro sistema. Confirme se este é o banco/servidor certo antes de rodar as migrations.
+- O banco é o PostgreSQL da VPS (`db.iwsolutions.cloud:5432`, banco dedicado `gcstock`, separado do `main_db`).
+  Todos os ambientes (inclusive o desenvolvimento local) consomem esse mesmo banco — ver "Configuração" abaixo.
 - Em ambiente **Development**, a API aplica as migrations pendentes e popula o banco automaticamente ao iniciar
   (`DbSeeder`), recriando os mesmos donos/empresas de demonstração que existiam no mock (para não perder o fluxo de
   login durante a migração):
@@ -134,7 +133,7 @@ Nenhuma alteração no `gcstock-ui` foi feita nesta tarefa — este passo fica p
 
 ## Worker
 
-Hosted service (`GCStock.Worker.Worker`) que executa um probe periódico no SQL Server (`SELECT 1`), com intervalo configurável via `Worker:DatabaseProbeIntervalSeconds` (padrão: 30 segundos). Sucesso e falha são registrados via `ILogger`.
+Hosted service (`GCStock.Worker.Worker`) que executa um probe periódico no PostgreSQL (`SELECT 1`), com intervalo configurável via `Worker:DatabaseProbeIntervalSeconds` (padrão: 30 segundos). Sucesso e falha são registrados via `ILogger`.
 
 ## Configuração
 
@@ -145,11 +144,24 @@ Hosted service (`GCStock.Worker.Worker`) que executa um probe periódico no SQL 
 - `appsettings.Staging.json`
 - `appsettings.Production.json`
 
-`ConnectionStrings:DefaultConnection` já vem com o valor padrão do ambiente de desenvolvimento/homologação:
+`ConnectionStrings:DefaultConnection` no `appsettings.json` aponta para o PostgreSQL da VPS **sem a senha**
+(nunca versione a senha):
 
 ```
-Server=db-nprd.valee.com.br;Database=GCStockDb;User Id=sa;Password=SqlAdm2010;TrustServerCertificate=True;
+Host=db.iwsolutions.cloud;Port=5432;Database=gcstock;Username=admin;SSL Mode=Prefer;Application Name=GCStock.Api
 ```
+
+A string completa (com `Password=...`) vem de fora do repositório:
+
+- **Desenvolvimento local:** user-secrets (uma vez por máquina, em cada projeto):
+
+  ```bash
+  dotnet user-secrets set "ConnectionStrings:DefaultConnection" "Host=db.iwsolutions.cloud;Port=5432;Database=gcstock;Username=admin;Password=<SENHA>;SSL Mode=Prefer;Application Name=GCStock.Api" --project src/GCStock.Api
+  dotnet user-secrets set "ConnectionStrings:DefaultConnection" "Host=db.iwsolutions.cloud;Port=5432;Database=gcstock;Username=admin;Password=<SENHA>;SSL Mode=Prefer;Application Name=GCStock.Worker" --project src/GCStock.Worker
+  ```
+
+- **Staging/Production (container):** variável de ambiente `ConnectionStrings__DefaultConnection`. Rodando no mesmo
+  Swarm da VPS, use o host interno `postgres` (rede overlay `backend`) em vez de `db.iwsolutions.cloud`.
 
 A seção `Jwt` (`Issuer`, `Audience`, `SecretKey`, `ExpiresMinutes`) segue o mesmo padrão — ver "Autenticação (JWT +
 bcrypt)" acima para os detalhes de `SecretKey` por ambiente.
@@ -171,7 +183,7 @@ com suporte a Bearer token — clique em "Authorize" e cole o token retornado po
 ### Docker
 
 - `deploy/api.Dockerfile` — build/publish multi-stage da API (`mcr.microsoft.com/dotnet/aspnet:10.0`), expõe a porta `8080`.
-- `deploy/worker.Dockerfile` — build/publish multi-stage do Worker (`mcr.microsoft.com/dotnet/runtime:10.0`).
+- `deploy/worker.Dockerfile` — build/publish multi-stage do Worker (`mcr.microsoft.com/dotnet/aspnet:10.0`).
 
 ### Stack (Docker Swarm)
 
@@ -183,9 +195,13 @@ com suporte a Bearer token — clique em "Authorize" e cole o token retornado po
 | `__API_IMAGE_NAME__`    | Nome da imagem da API                       |
 | `__WORKER_IMAGE_NAME__` | Nome da imagem do Worker                    |
 | `__DOCKER_TAG__`        | Tag da imagem (build id)                    |
-| `__ENVIRONMENT__`       | Ambiente (`production` / `staging`)         |
+| `__ENVIRONMENT__`       | Ambiente (`Production` / `Staging`)         |
 | `__SERVICE_NAME__`      | Nome da stack (`gcstock-prd` / `gcstock-stg`)   |
 | `__HOST_DOMAIN__`       | Domínio público exposto via Traefik         |
+
+A stack roda na VPS (Swarm + Traefik + Postgres próprio), usa as redes `public` e `backend`, lê a connection string e a
+chave JWT de **Swarm secrets** (`<stack>-db-connection`, `<stack>-jwt-secret`) e aplica migrations ao iniciar
+(`Database__MigrateOnStartup=true`). **Passo a passo de preparação do servidor (secrets, DNS, registry): `deploy/VPS.md`.**
 
 ### Pipeline (Azure DevOps)
 
@@ -193,13 +209,13 @@ com suporte a Bearer token — clique em "Authorize" e cole o token retornado po
 
 | Branch       | Stack       | Host                          | Appsettings               |
 | ------------ | ----------- | ------------------------------ | -------------------------- |
-| `production` | `gcstock-prd` | `api-girus.valee.com.br`       | `appsettings.Production.json` |
-| `staging`    | `gcstock-stg` | `api-girus-hml.valee.com.br`   | `appsettings.Staging.json`    |
+| `production` | `gcstock-prd` | `api.iwsolutions.cloud`       | `appsettings.Production.json` |
+| `staging`    | `gcstock-stg` | `api-hml.iwsolutions.cloud`   | `appsettings.Staging.json`    |
 
 Etapas do pipeline:
 
 1. Restore, build e testes da solução.
-2. Build e push das imagens de API e Worker para `cr.valee.com.br`.
+2. Build e push das imagens de API e Worker para `registry.iwsolutions.cloud`.
 3. Geração do `stack.yml` com os placeholders substituídos.
 4. Deploy via `docker stack deploy` no ambiente correspondente.
 

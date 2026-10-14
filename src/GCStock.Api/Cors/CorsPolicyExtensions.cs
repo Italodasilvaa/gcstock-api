@@ -14,7 +14,7 @@ public static class CorsPolicyExtensions
         var host = uri.Host;
 
         return host is "localhost" or "127.0.0.1"
-            || host.Equals("valee.com.br", StringComparison.OrdinalIgnoreCase)
-            || host.EndsWith(".valee.com.br", StringComparison.OrdinalIgnoreCase);
+            || host.Equals("iwsolutions.cloud", StringComparison.OrdinalIgnoreCase)
+            || host.EndsWith(".iwsolutions.cloud", StringComparison.OrdinalIgnoreCase);
     }
 }

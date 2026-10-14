@@ -33,7 +33,7 @@ Regras:
   - UnitTests -> Application, Domain
   - IntegrationTests -> Api, Infra
 - API com:
-  - CORS: localhost, valee.com.br e subdominios
+  - CORS: localhost, iwsolutions.cloud e subdominios
   - Swagger (Swashbuckle.AspNetCore 7.3.1)
   - Health checks:
     - /health/live (self)
@@ -47,23 +47,23 @@ Regras:
   - appsettings.staging.json
   - appsettings.production.json
 - ConnectionStrings:DefaultConnection padrao:
-  Server=db-nprd.valee.com.br;Database=dbValee-Refactor;User Id=sa;Password=SqlAdm2010;TrustServerCertificate=True;
+  Host=db.iwsolutions.cloud;Port=5432;Database=gcstock;Username=admin;SSL Mode=Prefer (senha via user-secrets / secret do Swarm)
 - Pasta deploy:
   - deploy/api.Dockerfile
   - deploy/worker.Dockerfile
   - deploy/stacks/stack.yml
 - Pipeline Azure em azure-pipelines.yml:
   - trigger: production e staging
-  - RegistryUrl: cr.valee.com.br
+  - RegistryUrl: registry.iwsolutions.cloud
   - ApiImageName: gcstock-api
   - WorkerImageName: gcstock-worker
   - production:
     - StackName: gcstock-prd
-    - HostDomain: api-girus.valee.com.br
+    - HostDomain: api.iwsolutions.cloud
     - appsettings production
   - staging:
     - StackName: gcstock-stg
-    - HostDomain: api-girus-hml.valee.com.br
+    - HostDomain: api-hml.iwsolutions.cloud
     - appsettings staging
   - build/push de API e Worker
   - stack deploy com placeholders em deploy/stacks/stack.yml
@@ -96,16 +96,16 @@ No deploy/stacks/stack.yml, usar:
 Crie base .NET 10 (slnx) DDD/Clean chamada GCStock com:
 src/{GCStock.Api,Worker,Application,Domain,Infra} e tests/{GCStock.UnitTests,IntegrationTests}.
 Refs: Application->Domain; Infra->Application+Domain; Api->Application+Infra; Worker->Application+Infra; Unit->Application+Domain; Integration->Api+Infra.
-API: CORS (localhost,valee.com.br,*.valee.com.br), Swagger Swashbuckle 7.3.1, health live/ready + /health alias.
+API: CORS (localhost,iwsolutions.cloud,*.iwsolutions.cloud), Swagger Swashbuckle 7.3.1, health live/ready + /health alias.
 Ready deve validar SQL Server com SELECT 1 e retornar JSON estruturado (status,duration,timestamp,checks).
 Worker: hosted service com probe SQL periodico (SELECT 1), intervalo por Worker:DatabaseProbeIntervalSeconds, logs de sucesso/falha.
 Appsettings em API e Worker: appsettings.json, development, staging, production.
-ConnectionStrings:DefaultConnection padrao = Server=db-nprd.valee.com.br;Database=dbValee-Refactor;User Id=sa;Password=SqlAdm2010;TrustServerCertificate=True;
+ConnectionStrings:DefaultConnection padrao = Host=db.iwsolutions.cloud;Port=5432;Database=gcstock;Username=admin;SSL Mode=Prefer (senha via user-secrets / secret do Swarm)
 Criar deploy/api.Dockerfile, deploy/worker.Dockerfile, deploy/stacks/stack.yml.
 Stack placeholders: __REGISTRY_URL__, __API_IMAGE_NAME__, __WORKER_IMAGE_NAME__, __DOCKER_TAG__, __ENVIRONMENT__, __SERVICE_NAME__, __HOST_DOMAIN__.
 Pipeline azure-pipelines.yml:
-trigger somente production e staging; RegistryUrl=cr.valee.com.br; ApiImageName=gcstock-api; WorkerImageName=gcstock-worker.
-Branch production: StackName=gcstock-prd, HostDomain=api-girus.valee.com.br, usa appsettings.production.json.
-Branch staging: StackName=gcstock-stg, HostDomain=api-girus-hml.valee.com.br, usa appsettings.staging.json.
+trigger somente production e staging; RegistryUrl=registry.iwsolutions.cloud; ApiImageName=gcstock-api; WorkerImageName=gcstock-worker.
+Branch production: StackName=gcstock-prd, HostDomain=api.iwsolutions.cloud, usa appsettings.production.json.
+Branch staging: StackName=gcstock-stg, HostDomain=api-hml.iwsolutions.cloud, usa appsettings.staging.json.
 Build/push API+Worker e deploy swarm via stack deploy com substituicao de placeholders.
 Atualizar README + .gitignore + .dockerignore e garantir dotnet build da solucao com sucesso.

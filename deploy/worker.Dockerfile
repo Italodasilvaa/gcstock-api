@@ -14,7 +14,7 @@ RUN dotnet restore src/GCStock.Worker/GCStock.Worker.csproj
 COPY . .
 RUN dotnet publish src/GCStock.Worker/GCStock.Worker.csproj -c Release -o /app/publish --no-restore
 
-FROM mcr.microsoft.com/dotnet/runtime:10.0 AS final
+FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS final
 WORKDIR /app
 
 COPY --from=build /app/publish .

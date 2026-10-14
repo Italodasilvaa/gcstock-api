@@ -1,40 +1,58 @@
 version: "3.8"
 
+# Stack do GC Stock na VPS (Swarm + Traefik + Postgres da própria VPS).
+# Pré-requisitos (secrets, DNS, login no registry): ver deploy/VPS.md.
+
 services:
   api:
     image: __REGISTRY_URL__/__API_IMAGE_NAME__:__DOCKER_TAG__
     environment:
       ASPNETCORE_ENVIRONMENT: __ENVIRONMENT__
+      # Atrás do Traefik (TLS termina nele): respeita X-Forwarded-Proto/For.
+      ASPNETCORE_FORWARDEDHEADERS_ENABLED: "true"
+      # Aplica migrations pendentes ao iniciar (não roda seed de demonstração).
+      Database__MigrateOnStartup: "true"
+      TZ: America/Sao_Paulo
+    secrets:
+      # Cada secret vira um arquivo em /run/secrets/<target>, lido como configuração (AddKeyPerFile).
+      - source: gcstock_db_connection
+        target: ConnectionStrings__DefaultConnection
+      - source: gcstock_jwt_secret
+        target: Jwt__SecretKey
     networks:
-      - gcstock-network
-      - traefik-public
+      - public    # Traefik
+      - backend   # Postgres (host interno: postgres)
+    healthcheck:
+      # A imagem aspnet não tem curl/wget: testa apenas se a porta 8080 aceita conexão.
+      test: ["CMD-SHELL", "exec 3<>/dev/tcp/127.0.0.1/8080"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
     deploy:
-      labels:
-        - "traefik.enable=true"
-        - "traefik.docker.network=traefik-public"
-        - "traefik.http.routers.__SERVICE_NAME__-api.rule=Host(`__HOST_DOMAIN__`)"
-        - "traefik.http.routers.__SERVICE_NAME__-api.entrypoints=websecure"
-        - "traefik.http.routers.__SERVICE_NAME__-api.tls=true"
-        - "traefik.http.services.__SERVICE_NAME__-api.loadbalancer.server.port=8080"
       replicas: 1
       restart_policy:
         condition: on-failure
       update_config:
         order: start-first
         failure_action: rollback
-      healthcheck:
-        test: ["CMD", "wget", "-qO-", "http://localhost:8080/health/live"]
-        interval: 30s
-        timeout: 5s
-        retries: 3
-        start_period: 20s
+      labels:
+        - "traefik.enable=true"
+        - "traefik.http.routers.__SERVICE_NAME__-api.rule=Host(`__HOST_DOMAIN__`)"
+        - "traefik.http.routers.__SERVICE_NAME__-api.entrypoints=websecure"
+        - "traefik.http.routers.__SERVICE_NAME__-api.tls.certresolver=myresolver"
+        - "traefik.http.services.__SERVICE_NAME__-api.loadbalancer.server.port=8080"
 
   worker:
     image: __REGISTRY_URL__/__WORKER_IMAGE_NAME__:__DOCKER_TAG__
     environment:
-      ASPNETCORE_ENVIRONMENT: __ENVIRONMENT__
+      DOTNET_ENVIRONMENT: __ENVIRONMENT__
+      TZ: America/Sao_Paulo
+    secrets:
+      - source: gcstock_db_connection
+        target: ConnectionStrings__DefaultConnection
     networks:
-      - gcstock-network
+      - backend
     deploy:
       replicas: 1
       restart_policy:
@@ -43,8 +61,16 @@ services:
         order: start-first
         failure_action: rollback
 
+secrets:
+  gcstock_db_connection:
+    external: true
+    name: __SERVICE_NAME__-db-connection
+  gcstock_jwt_secret:
+    external: true
+    name: __SERVICE_NAME__-jwt-secret
+
 networks:
-  gcstock-network:
-    driver: overlay
-  traefik-public:
+  public:
+    external: true
+  backend:
     external: true

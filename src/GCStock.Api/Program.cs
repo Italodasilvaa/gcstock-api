@@ -14,6 +14,9 @@ using Microsoft.IdentityModel.Tokens;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// Docker/Swarm secrets montados em /run/secrets (um arquivo por chave, ex.: ConnectionStrings__DefaultConnection).
+builder.Configuration.AddKeyPerFile("/run/secrets", optional: true);
+
 builder.Services.AddInfra(builder.Configuration);
 
 var jwtSettings = builder.Configuration.GetSection(JwtSettings.SectionName).Get<JwtSettings>() ?? new JwtSettings();
@@ -90,15 +93,19 @@ builder.Services.AddSwaggerGen(options =>
 
 var app = builder.Build();
 
-// Em desenvolvimento, aplica as migrations pendentes e semeia os dados de demonstração
-// automaticamente. Em Staging/Production, rode `dotnet ef database update` manualmente/no pipeline.
-if (app.Environment.IsDevelopment())
+// Aplica as migrations pendentes em Development ou quando Database:MigrateOnStartup=true (stack da VPS).
+// O seed de demonstração roda somente em Development.
+var migrateOnStartup = app.Configuration.GetValue<bool>("Database:MigrateOnStartup");
+if (app.Environment.IsDevelopment() || migrateOnStartup)
 {
     using var scope = app.Services.CreateScope();
     var db = scope.ServiceProvider.GetRequiredService<GCStockDbContext>();
     await db.Database.MigrateAsync();
-    var hasher = scope.ServiceProvider.GetRequiredService<IPasswordHasher>();
-    await DbSeeder.SeedAsync(db, hasher);
+    if (app.Environment.IsDevelopment())
+    {
+        var hasher = scope.ServiceProvider.GetRequiredService<IPasswordHasher>();
+        await DbSeeder.SeedAsync(db, hasher);
+    }
 }
 
 app.UseSwagger();

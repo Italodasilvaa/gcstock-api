@@ -5,18 +5,21 @@ trigger:
       - staging
 
 variables:
-  RegistryUrl: "cr.valee.com.br"
+  RegistryUrl: "registry.iwsolutions.cloud"
+  RegistryConnection: "registry.iwsolutions.cloud"
   ApiImageName: "gcstock-api"
   WorkerImageName: "gcstock-worker"
   DockerTag: "$(Build.BuildId)"
   ${{ if eq(variables['Build.SourceBranchName'], 'production') }}:
     Environment: "production"
+    AspNetEnvironment: "Production"
     StackName: "gcstock-prd"
-    HostDomain: "api-girus.valee.com.br"
+    HostDomain: "api.iwsolutions.cloud"
   ${{ if eq(variables['Build.SourceBranchName'], 'staging') }}:
     Environment: "staging"
+    AspNetEnvironment: "Staging"
     StackName: "gcstock-stg"
-    HostDomain: "api-girus-hml.valee.com.br"
+    HostDomain: "api-hml.iwsolutions.cloud"
 
 pool:
   vmImage: "ubuntu-latest"
@@ -53,7 +56,7 @@ stages:
           - task: Docker@2
             displayName: "Build e push da API"
             inputs:
-              containerRegistry: "$(RegistryUrl)"
+              containerRegistry: "$(RegistryConnection)"
               repository: "$(ApiImageName)"
               command: "buildAndPush"
               Dockerfile: "deploy/api.Dockerfile"
@@ -65,7 +68,7 @@ stages:
           - task: Docker@2
             displayName: "Build e push do Worker"
             inputs:
-              containerRegistry: "$(RegistryUrl)"
+              containerRegistry: "$(RegistryConnection)"
               repository: "$(WorkerImageName)"
               command: "buildAndPush"
               Dockerfile: "deploy/worker.Dockerfile"
@@ -96,7 +99,7 @@ stages:
                         -e "s|__API_IMAGE_NAME__|$(ApiImageName)|g" \
                         -e "s|__WORKER_IMAGE_NAME__|$(WorkerImageName)|g" \
                         -e "s|__DOCKER_TAG__|$(DockerTag)|g" \
-                        -e "s|__ENVIRONMENT__|$(Environment)|g" \
+                        -e "s|__ENVIRONMENT__|$(AspNetEnvironment)|g" \
                         -e "s|__SERVICE_NAME__|$(StackName)|g" \
                         -e "s|__HOST_DOMAIN__|$(HostDomain)|g" \
                         deploy/stacks/stack.yml > $(Build.ArtifactStagingDirectory)/stack.$(Environment).yml
