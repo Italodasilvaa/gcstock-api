@@ -99,7 +99,7 @@ Todos os dados são isolados por empresa (`companyId` extraído das claims do JW
 
 ### Banco de dados e seed
 
-- O banco é o PostgreSQL da VPS (`db.iwsolutions.cloud:5432`, banco dedicado `gcstock`, separado do `main_db`).
+- Dois bancos no PostgreSQL da VPS (`db.iwsolutions.cloud:5432`): `gcstock_nprd` (desenvolvimento/homologação, com seed de demonstração) e `gcstock_prd` (produção, sem seed). O desenvolvimento local usa o `gcstock_nprd`; o `gcstock_prd` só é acessado pela stack de produção (ver `deploy/VPS.md`).
   Todos os ambientes (inclusive o desenvolvimento local) consomem esse mesmo banco — ver "Configuração" abaixo.
 - Em ambiente **Development**, a API aplica as migrations pendentes e popula o banco automaticamente ao iniciar
   (`DbSeeder`), recriando os mesmos donos/empresas de demonstração que existiam no mock (para não perder o fluxo de
@@ -148,7 +148,7 @@ Hosted service (`GCStock.Worker.Worker`) que executa um probe periódico no Post
 (nunca versione a senha):
 
 ```
-Host=db.iwsolutions.cloud;Port=5432;Database=gcstock;Username=admin;SSL Mode=Prefer;Application Name=GCStock.Api
+Host=db.iwsolutions.cloud;Port=5432;Database=gcstock_nprd;Username=admin;SSL Mode=Prefer;Application Name=GCStock.Api
 ```
 
 A string completa (com `Password=...`) vem de fora do repositório:
@@ -156,8 +156,8 @@ A string completa (com `Password=...`) vem de fora do repositório:
 - **Desenvolvimento local:** user-secrets (uma vez por máquina, em cada projeto):
 
   ```bash
-  dotnet user-secrets set "ConnectionStrings:DefaultConnection" "Host=db.iwsolutions.cloud;Port=5432;Database=gcstock;Username=admin;Password=<SENHA>;SSL Mode=Prefer;Application Name=GCStock.Api" --project src/GCStock.Api
-  dotnet user-secrets set "ConnectionStrings:DefaultConnection" "Host=db.iwsolutions.cloud;Port=5432;Database=gcstock;Username=admin;Password=<SENHA>;SSL Mode=Prefer;Application Name=GCStock.Worker" --project src/GCStock.Worker
+  dotnet user-secrets set "ConnectionStrings:DefaultConnection" "Host=db.iwsolutions.cloud;Port=5432;Database=gcstock_nprd;Username=admin;Password=<SENHA>;SSL Mode=Prefer;Application Name=GCStock.Api" --project src/GCStock.Api
+  dotnet user-secrets set "ConnectionStrings:DefaultConnection" "Host=db.iwsolutions.cloud;Port=5432;Database=gcstock_nprd;Username=admin;Password=<SENHA>;SSL Mode=Prefer;Application Name=GCStock.Worker" --project src/GCStock.Worker
   ```
 
 - **Staging/Production (container):** variável de ambiente `ConnectionStrings__DefaultConnection`. Rodando no mesmo
