@@ -1,0 +1,13 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/GCStock.Api/GCStock.Api.csproj" />
+    <Project Path="src/GCStock.Application/GCStock.Application.csproj" />
+    <Project Path="src/GCStock.Domain/GCStock.Domain.csproj" />
+    <Project Path="src/GCStock.Infra/GCStock.Infra.csproj" />
+    <Project Path="src/GCStock.Worker/GCStock.Worker.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/GCStock.IntegrationTests/GCStock.IntegrationTests.csproj" />
+    <Project Path="tests/GCStock.UnitTests/GCStock.UnitTests.csproj" />
+  </Folder>
+</Solution>

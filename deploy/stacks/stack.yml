@@ -6,7 +6,7 @@ services:
     environment:
       ASPNETCORE_ENVIRONMENT: __ENVIRONMENT__
     networks:
-      - girus-network
+      - gcstock-network
       - traefik-public
     deploy:
       labels:
@@ -34,7 +34,7 @@ services:
     environment:
       ASPNETCORE_ENVIRONMENT: __ENVIRONMENT__
     networks:
-      - girus-network
+      - gcstock-network
     deploy:
       replicas: 1
       restart_policy:
@@ -44,7 +44,7 @@ services:
         failure_action: rollback
 
 networks:
-  girus-network:
+  gcstock-network:
     driver: overlay
   traefik-public:
     external: true

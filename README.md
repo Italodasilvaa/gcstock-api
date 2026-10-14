@@ -1,20 +1,20 @@
-# Girus API
+# GC Stock API
 
-Base .NET 10 em DDD/Clean Architecture para a API e o Worker do Girus.
+Base .NET 10 em DDD/Clean Architecture para a API e o Worker do GC Stock ERP (antigo Girus).
 
 ## Estrutura da solução
 
 ```
-Girus.slnx
+GCStock.slnx
 src/
-  Girus.Api           # API HTTP (minimal APIs, Swagger, CORS, health checks)
-  Girus.Worker         # Worker Service com probe SQL periódico
-  Girus.Application    # Casos de uso / regras de aplicação
-  Girus.Domain         # Entidades e regras de domínio
-  Girus.Infra          # Acesso a dados, health checks, integrações
+  GCStock.Api           # API HTTP (minimal APIs, Swagger, CORS, health checks)
+  GCStock.Worker         # Worker Service com probe SQL periódico
+  GCStock.Application    # Casos de uso / regras de aplicação
+  GCStock.Domain         # Entidades e regras de domínio
+  GCStock.Infra          # Acesso a dados, health checks, integrações
 tests/
-  Girus.UnitTests        # Testes unitários (Application/Domain)
-  Girus.IntegrationTests  # Testes de integração (Api/Infra)
+  GCStock.UnitTests        # Testes unitários (Application/Domain)
+  GCStock.IntegrationTests  # Testes de integração (Api/Infra)
 deploy/
   api.Dockerfile
   worker.Dockerfile
@@ -24,12 +24,12 @@ azure-pipelines.yml
 
 ### Referências entre projetos
 
-- `Girus.Application` → `Girus.Domain`
-- `Girus.Infra` → `Girus.Application`, `Girus.Domain`
-- `Girus.Api` → `Girus.Application`, `Girus.Infra`
-- `Girus.Worker` → `Girus.Application`, `Girus.Infra`
-- `Girus.UnitTests` → `Girus.Application`, `Girus.Domain`
-- `Girus.IntegrationTests` → `Girus.Api`, `Girus.Infra`
+- `GCStock.Application` → `GCStock.Domain`
+- `GCStock.Infra` → `GCStock.Application`, `GCStock.Domain`
+- `GCStock.Api` → `GCStock.Application`, `GCStock.Infra`
+- `GCStock.Worker` → `GCStock.Application`, `GCStock.Infra`
+- `GCStock.UnitTests` → `GCStock.Application`, `GCStock.Domain`
+- `GCStock.IntegrationTests` → `GCStock.Api`, `GCStock.Infra`
 
 ## API
 
@@ -59,11 +59,11 @@ azure-pipelines.yml
   }
   ```
 
-## Domínio de negócio (Girus ERP)
+## Domínio de negócio (GC Stock ERP)
 
 A API implementa, com banco real (SQL Server via EF Core) e autenticação JWT real (bcrypt + JWT), o mesmo contrato
-que o front-end `girus-ui` hoje simula localmente no `MockDataService` (multi-empresa, produtos, kits, estoque,
-compras, financeiro, PDV, clientes, funcionários e auditoria). Ver `src/Girus.Api/Endpoints/*.cs` para o mapeamento
+que o front-end `gcstock-ui` hoje simula localmente no `MockDataService` (multi-empresa, produtos, kits, estoque,
+compras, financeiro, PDV, clientes, funcionários e auditoria). Ver `src/GCStock.Api/Endpoints/*.cs` para o mapeamento
 completo das rotas — resumo:
 
 | Área | Rotas | Autenticação |
@@ -99,7 +99,7 @@ Todos os dados são isolados por empresa (`companyId` extraído das claims do JW
 
 ### Banco de dados e seed
 
-- O `ConnectionStrings:DefaultConnection` padrão foi ajustado para apontar para um banco dedicado (`GirusDb`) no
+- O `ConnectionStrings:DefaultConnection` padrão foi ajustado para apontar para um banco dedicado (`GCStockDb`) no
   mesmo servidor de dev/homologação já configurado no projeto, em vez de `dbValee-Refactor` — evitando colidir com
   as tabelas de outro sistema. Confirme se este é o banco/servidor certo antes de rodar as migrations.
 - Em ambiente **Development**, a API aplica as migrations pendentes e popula o banco automaticamente ao iniciar
@@ -115,30 +115,30 @@ Todos os dados são isolados por empresa (`companyId` extraído das claims do JW
 - Em **Staging/Production**, rode as migrations manualmente (ou via pipeline) antes do primeiro deploy:
 
   ```bash
-  dotnet ef database update --project src/Girus.Infra --startup-project src/Girus.Api
+  dotnet ef database update --project src/GCStock.Infra --startup-project src/GCStock.Api
   ```
 
-### Como conectar o front-end (girus-ui)
+### Como conectar o front-end (gcstock-ui)
 
-O `girus-ui` hoje fala inteiramente com `MockDataService` (dados no `localStorage`). Para plugar nesta API:
+O `gcstock-ui` hoje fala inteiramente com `MockDataService` (dados no `localStorage`). Para plugar nesta API:
 
 1. Trocar cada chamada `mockData.xxx(...)` por uma chamada HTTP equivalente (mesmos nomes de campos — os DTOs em
-   `Girus.Application/*/*.cs` foram desenhados espelhando `src/app/core/models/models.ts`).
+   `GCStock.Application/*/*.cs` foram desenhados espelhando `src/app/core/models/models.ts`).
 2. Guardar o `token` retornado por `/auth/login` (ou `/auth/register-company`) e anexá-lo em todas as chamadas via
    um `HttpInterceptor` (`Authorization: Bearer <token>`).
 3. Substituir `getCurrentSession()` por uma chamada a `GET /api/v1/auth/me` na inicialização do app, para validar o
    token salvo e restaurar a sessão.
 4. Ajustar `environment.ts`/`environment.development.ts` com a URL base da API (ex.: `http://localhost:5xxx`).
 
-Nenhuma alteração no `girus-ui` foi feita nesta tarefa — este passo fica para quando a integração for ligada de fato.
+Nenhuma alteração no `gcstock-ui` foi feita nesta tarefa — este passo fica para quando a integração for ligada de fato.
 
 ## Worker
 
-Hosted service (`Girus.Worker.Worker`) que executa um probe periódico no SQL Server (`SELECT 1`), com intervalo configurável via `Worker:DatabaseProbeIntervalSeconds` (padrão: 30 segundos). Sucesso e falha são registrados via `ILogger`.
+Hosted service (`GCStock.Worker.Worker`) que executa um probe periódico no SQL Server (`SELECT 1`), com intervalo configurável via `Worker:DatabaseProbeIntervalSeconds` (padrão: 30 segundos). Sucesso e falha são registrados via `ILogger`.
 
 ## Configuração
 
-`Girus.Api` e `Girus.Worker` seguem o padrão de configuração por ambiente:
+`GCStock.Api` e `GCStock.Worker` seguem o padrão de configuração por ambiente:
 
 - `appsettings.json`
 - `appsettings.Development.json`
@@ -148,7 +148,7 @@ Hosted service (`Girus.Worker.Worker`) que executa um probe periódico no SQL Se
 `ConnectionStrings:DefaultConnection` já vem com o valor padrão do ambiente de desenvolvimento/homologação:
 
 ```
-Server=db-nprd.valee.com.br;Database=GirusDb;User Id=sa;Password=SqlAdm2010;TrustServerCertificate=True;
+Server=db-nprd.valee.com.br;Database=GCStockDb;User Id=sa;Password=SqlAdm2010;TrustServerCertificate=True;
 ```
 
 A seção `Jwt` (`Issuer`, `Audience`, `SecretKey`, `ExpiresMinutes`) segue o mesmo padrão — ver "Autenticação (JWT +
@@ -157,10 +157,10 @@ bcrypt)" acima para os detalhes de `SecretKey` por ambiente.
 ## Build, testes e execução local
 
 ```bash
-dotnet build Girus.slnx
-dotnet test Girus.slnx
-dotnet run --project src/Girus.Api    # aplica migrations + seed automaticamente em Development
-dotnet run --project src/Girus.Worker
+dotnet build GCStock.slnx
+dotnet test GCStock.slnx
+dotnet run --project src/GCStock.Api    # aplica migrations + seed automaticamente em Development
+dotnet run --project src/GCStock.Worker
 ```
 
 Depois de rodando, abra `https://localhost:<porta>/swagger` para testar os endpoints (o Swagger já vem configurado
@@ -184,7 +184,7 @@ com suporte a Bearer token — clique em "Authorize" e cole o token retornado po
 | `__WORKER_IMAGE_NAME__` | Nome da imagem do Worker                    |
 | `__DOCKER_TAG__`        | Tag da imagem (build id)                    |
 | `__ENVIRONMENT__`       | Ambiente (`production` / `staging`)         |
-| `__SERVICE_NAME__`      | Nome da stack (`girus-prd` / `girus-stg`)   |
+| `__SERVICE_NAME__`      | Nome da stack (`gcstock-prd` / `gcstock-stg`)   |
 | `__HOST_DOMAIN__`       | Domínio público exposto via Traefik         |
 
 ### Pipeline (Azure DevOps)
@@ -193,8 +193,8 @@ com suporte a Bearer token — clique em "Authorize" e cole o token retornado po
 
 | Branch       | Stack       | Host                          | Appsettings               |
 | ------------ | ----------- | ------------------------------ | -------------------------- |
-| `production` | `girus-prd` | `api-girus.valee.com.br`       | `appsettings.Production.json` |
-| `staging`    | `girus-stg` | `api-girus-hml.valee.com.br`   | `appsettings.Staging.json`    |
+| `production` | `gcstock-prd` | `api-girus.valee.com.br`       | `appsettings.Production.json` |
+| `staging`    | `gcstock-stg` | `api-girus-hml.valee.com.br`   | `appsettings.Staging.json`    |
 
 Etapas do pipeline:
 
