@@ -196,7 +196,7 @@ com suporte a Bearer token — clique em "Authorize" e cole o token retornado po
 | `__WORKER_IMAGE_NAME__` | Nome da imagem do Worker                    |
 | `__DOCKER_TAG__`        | Tag da imagem (build id)                    |
 | `__ENVIRONMENT__`       | Ambiente (`Production` / `Staging`)         |
-| `__SERVICE_NAME__`      | Nome da stack (`gcstock-prd` / `gcstock-stg`)   |
+| `__SERVICE_NAME__`      | Nome da stack (`gcstock-prd` / `gcstock-nprd`)   |
 | `__HOST_DOMAIN__`       | Domínio público exposto via Traefik         |
 
 A stack roda na VPS (Swarm + Traefik + Postgres próprio), usa as redes `public` e `backend`, lê a connection string e a
@@ -210,7 +210,7 @@ chave JWT de **Swarm secrets** (`<stack>-db-connection`, `<stack>-jwt-secret`) e
 | Branch       | Stack       | Host                          | Appsettings               |
 | ------------ | ----------- | ------------------------------ | -------------------------- |
 | `production` | `gcstock-prd` | `api.iwsolutions.cloud`       | `appsettings.Production.json` |
-| `staging`    | `gcstock-stg` | `api-hml.iwsolutions.cloud`   | `appsettings.Staging.json`    |
+| `staging`    | `gcstock-nprd` | `api-nprd.iwsolutions.cloud`   | `appsettings.Staging.json`    |
 
 Etapas do pipeline:
 

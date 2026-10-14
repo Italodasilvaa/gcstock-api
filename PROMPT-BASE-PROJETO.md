@@ -62,8 +62,8 @@ Regras:
     - HostDomain: api.iwsolutions.cloud
     - appsettings production
   - staging:
-    - StackName: gcstock-stg
-    - HostDomain: api-hml.iwsolutions.cloud
+    - StackName: gcstock-nprd
+    - HostDomain: api-nprd.iwsolutions.cloud
     - appsettings staging
   - build/push de API e Worker
   - stack deploy com placeholders em deploy/stacks/stack.yml
@@ -106,6 +106,6 @@ Stack placeholders: __REGISTRY_URL__, __API_IMAGE_NAME__, __WORKER_IMAGE_NAME__,
 Pipeline azure-pipelines.yml:
 trigger somente production e staging; RegistryUrl=registry.iwsolutions.cloud; ApiImageName=gcstock-api; WorkerImageName=gcstock-worker.
 Branch production: StackName=gcstock-prd, HostDomain=api.iwsolutions.cloud, usa appsettings.production.json.
-Branch staging: StackName=gcstock-stg, HostDomain=api-hml.iwsolutions.cloud, usa appsettings.staging.json.
+Branch staging: StackName=gcstock-nprd, HostDomain=api-nprd.iwsolutions.cloud, usa appsettings.staging.json.
 Build/push API+Worker e deploy swarm via stack deploy com substituicao de placeholders.
 Atualizar README + .gitignore + .dockerignore e garantir dotnet build da solucao com sucesso.

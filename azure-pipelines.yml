@@ -18,8 +18,8 @@ variables:
   ${{ if eq(variables['Build.SourceBranchName'], 'staging') }}:
     Environment: "staging"
     AspNetEnvironment: "Staging"
-    StackName: "gcstock-stg"
-    HostDomain: "api-hml.iwsolutions.cloud"
+    StackName: "gcstock-nprd"
+    HostDomain: "api-nprd.iwsolutions.cloud"
 
 pool:
   vmImage: "ubuntu-latest"

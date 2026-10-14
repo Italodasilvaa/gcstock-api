@@ -3,28 +3,44 @@
 Stack: Swarm + Traefik (`myresolver`) + Postgres da própria VPS. API em `https://api.iwsolutions.cloud`.
 Execute **uma vez** no servidor (`ssh root@2.25.255.102`) antes do primeiro deploy.
 
-## 1. Banco e secrets
+## 1. Bancos e secrets
+
+Dois bancos na mesma instância Postgres (já criados, com as migrations aplicadas):
+
+| Ambiente | Banco | Stack | Host da API | Dados |
+|----------|-------|-------|-------------|-------|
+| nprd (desenvolvimento/homologação) | `gcstock_nprd` | `gcstock-nprd` | `api-nprd.iwsolutions.cloud` | seed de demonstração (logins com senha `123`) |
+| prd (produção) | `gcstock_prd` | `gcstock-prd` | `api.iwsolutions.cloud` | vazio (sem seed) |
+
+O desenvolvimento local usa `gcstock_nprd` (user-secrets). O `gcstock_prd` só é acessado pela stack de produção.
+
+No servidor, crie os secrets de cada stack (host interno `postgres`, rede overlay `backend`). Troque `<SENHA_POSTGRES>`:
 
 ```bash
-# Banco do sistema (já criado e populado em produção). Para o ambiente de homologação:
-# docker exec -it $(docker ps -q -f name=postgres_postgres.1) createdb -U admin gcstock_hml
-
-# Connection string interna (host "postgres", rede overlay backend). Troque <SENHA_POSTGRES>.
-printf 'Host=postgres;Port=5432;Database=gcstock;Username=admin;Password=<SENHA_POSTGRES>;Application Name=GCStock' \
+# --- prd ---
+printf 'Host=postgres;Port=5432;Database=gcstock_prd;Username=admin;Password=<SENHA_POSTGRES>;Application Name=GCStock' \
   | docker secret create gcstock-prd-db-connection -
+openssl rand -base64 48 | tr -d '\n' | docker secret create gcstock-prd-jwt-secret -   # >= 32 caracteres, único por ambiente
 
-# Chave JWT (>= 32 caracteres, NÃO reaproveitar a de desenvolvimento)
-openssl rand -base64 48 | tr -d '\n' | docker secret create gcstock-prd-jwt-secret -
+# --- nprd ---
+printf 'Host=postgres;Port=5432;Database=gcstock_nprd;Username=admin;Password=<SENHA_POSTGRES>;Application Name=GCStock' \
+  | docker secret create gcstock-nprd-db-connection -
+openssl rand -base64 48 | tr -d '\n' | docker secret create gcstock-nprd-jwt-secret -
 ```
 
-Homologação (opcional): mesmos comandos com `gcstock-stg-db-connection` / `gcstock-stg-jwt-secret` e `Database=gcstock_hml`.
+Migrations novas: aplicadas sozinhas quando a API sobe (`Database__MigrateOnStartup=true`). Para aplicar manualmente em um banco:
+
+```bash
+dotnet ef database update --project src/GCStock.Infra --startup-project src/GCStock.Api \
+  --connection "Host=db.iwsolutions.cloud;Port=5432;Database=gcstock_prd;Username=admin;Password=<SENHA>"
+```
 
 ## 2. DNS (Cloudflare)
 
 | Host | Aponta para | Proxy |
 |------|-------------|-------|
 | `api.iwsolutions.cloud` | 2.25.255.102 | Proxied (laranja) |
-| `api-hml.iwsolutions.cloud` (opcional) | 2.25.255.102 | Proxied (laranja) |
+| `api-nprd.iwsolutions.cloud` | 2.25.255.102 | Proxied (laranja) |
 
 ## 3. Registry
 
@@ -37,7 +53,7 @@ docker login registry.iwsolutions.cloud -u admin
 ## 4. Azure DevOps (service connections)
 
 - **Docker Registry** chamada `registry.iwsolutions.cloud` (usuário `admin` do registry).
-- **SSH** chamadas `swarm-production` (e `swarm-staging`) apontando para `root@2.25.255.102`.
+- **SSH** chamadas `swarm-production` (e `swarm-staging` (nprd)) apontando para `root@2.25.255.102`.
 - Environments `production` / `staging`.
 
 ## 5. Deploy manual (sem pipeline)
