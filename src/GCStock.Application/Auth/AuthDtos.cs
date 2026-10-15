@@ -16,7 +16,7 @@ public record CompanySummaryDto(
     int BranchesCount,
     string Plan);
 
-public record AuthUserDto(Guid Id, string Name, string Email, string Role, Guid? EmployeeId);
+public record AuthUserDto(Guid Id, string Name, string Email, string Role, Guid? EmployeeId, List<string> Permissions);
 
 public record AuthSessionDto(AuthUserDto User, CompanySummaryDto Company, string Token, DateTime LoggedInAt);
 

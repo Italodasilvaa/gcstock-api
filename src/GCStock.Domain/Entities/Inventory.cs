@@ -11,7 +11,10 @@ public class StockBatch
     public string ProductName { get; set; } = string.Empty;
     public string Sku { get; set; } = string.Empty;
     public string LotNumber { get; set; } = string.Empty;
+    /// <summary>Quantidade disponível do lote, na unidade do produto (o nome "Kg" é histórico: pode ser kg, pct, un...).</summary>
     public decimal AvailableKg { get; set; }
+    /// <summary>Unidade do produto (cadastro): "kg" | "un" | "pct" | "cx".</summary>
+    public string Unit { get; set; } = "kg";
     public DateOnly EntryDate { get; set; }
     public DateOnly ExpiryDate { get; set; }
     public int DaysRemaining { get; set; }
@@ -33,7 +36,10 @@ public class StockMovement
     public string Type { get; set; } = "entrada";
     public string Title { get; set; } = string.Empty;
     public string DocInfo { get; set; } = string.Empty;
+    /// <summary>Quantidade movimentada na unidade em <see cref="Unit"/> (o nome "Kg" é histórico). Negativo = saída.</summary>
     public decimal AmountKg { get; set; }
+    /// <summary>Unidade da quantidade: "kg" | "un" | "pct" | "cx".</summary>
+    public string Unit { get; set; } = "kg";
     public string Description { get; set; } = string.Empty;
     public string BadgeLabel { get; set; } = string.Empty;
     public string AuditLink { get; set; } = string.Empty;

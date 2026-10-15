@@ -1,3 +1,4 @@
+using GCStock.Application.Access;
 using GCStock.Application.Clients;
 
 namespace GCStock.Api.Endpoints;
@@ -12,9 +13,9 @@ public static class ClientEndpoints
             Results.Ok(await service.GetAllAsync(ct)));
 
         group.MapPost("/", async (SaveClientRequest request, IClientService service, CancellationToken ct) =>
-            Results.Created("/api/v1/clientes", await service.SaveAsync(request, ct)));
+            Results.Created("/api/v1/clientes", await service.SaveAsync(request, ct))).RequireAuthorization(Permissions.ClientsCreate);
 
         group.MapPut("/{id:guid}", async (Guid id, SaveClientRequest request, IClientService service, CancellationToken ct) =>
-            Results.Ok(await service.SaveAsync(request with { Id = id }, ct)));
+            Results.Ok(await service.SaveAsync(request with { Id = id }, ct))).RequireAuthorization(Permissions.ClientsEdit);
     }
 }

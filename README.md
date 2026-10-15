@@ -220,6 +220,81 @@ Etapas do pipeline:
 4. Deploy via `docker stack deploy` no ambiente correspondente.
 
 
+## Permissões de funcionários
+
+Cada funcionário recebe permissões granulares de **criar, editar e excluir** em cada tela, guardadas em
+`Employees.Permissions` (`text[]`). O papel (`admin`/`gerente`/`operador`) é só um rótulo e não concede nada.
+
+- **Dono da empresa** (Administrator): possui **todas** as permissões, sem nenhum cadastro.
+- **Consultar** (GET) é liberado a qualquer usuário autenticado.
+- **Atribuir permissões** é exclusivo do dono (a API responde 403 para outros usuários, mesmo com `funcionarios.editar`).
+- Funcionário novo nasce **sem** permissões. A permissão é lida do banco a cada chamada, então revogar vale na hora,
+  mesmo com o token ainda válido.
+
+| Tela | Permissões |
+|------|-----------|
+| Produtos | `produtos.criar`, `produtos.editar`, `produtos.excluir` |
+| Categorias de produto | `categorias.criar`, `categorias.editar` (inclui reordenar), `categorias.excluir` |
+| Kits de churrasco | `kits.criar`, `kits.editar`, `kits.excluir` |
+| Compras | `compras.criar` (lançar entrada), `compras.editar` (editar pedidos, inclusive pagos) |
+| Vendas (PDV) | `vendas.criar` (finalizar venda), `vendas.alterar-preco` (vender com preço diferente do cadastro; validado no `PosService`), `vendas.cancelar` (cancelar/estornar venda) |
+| Clientes | `clientes.criar`, `clientes.editar` |
+| Funcionários | `funcionarios.criar`, `funcionarios.editar`, `funcionarios.excluir` |
+| Contas a pagar | `contas-pagar.criar`, `contas-pagar.baixar` |
+| Contas a receber | `contas-receber.criar`, `contas-receber.liquidar` |
+| Cartões | `cartoes.antecipar` |
+| Configurações | `taxas.criar`, `taxas.editar` (inclui ativar e reordenar), `alertas.editar` |
+
+São 27 permissões: 26 protegem rotas de escrita (28 rotas) e `vendas.alterar-preco` é conferida dentro do PDV. Rotas de escrita sem permissão de catálogo (exceções): login/cadastro/logout/renovação,
+troca e transferência entre empresas (só o dono, validado no serviço) e upload de arquivos (qualquer usuário logado).
+
+- `GET /api/v1/permissoes` devolve o catálogo (rótulo, descrição e grupo), usado pelo cadastro de funcionários.
+- `AuthUserDto.Permissions` (login, `/auth/me`, renovação) traz as permissões do usuário para o front esconder botões.
+- Nova permissão: adicione a constante e a entrada em `Permissions.All` (`GCStock.Application/Access`) e proteja a rota com
+  `.RequireAuthorization(Permissions.Xxx)`. A policy é registrada sozinha e o front exibe a opção. O teste
+  `WriteRoutesPermissionTests` falha se uma rota de escrita nova ficar sem permissão.
+- Migration `AddEmployeePermissions`: funcionários existentes passam a ter lista vazia (`'{}'`); o dono precisa liberar
+  o que cada um deve fazer.
+
+## Estoque, lotes e unidades
+
+- **Fonte da verdade:** `Product.Stock`. Vendas, compras (inclusive edição) e ajuste manual do estoque mexem nele.
+- **Lotes** (`StockBatch`, tela de Estoque) nunca somam mais que o estoque do produto: o excesso é consumido primeiro dos lotes
+  que vencem antes (FEFO), em `StockLots.ReconcileAsync`. Lotes zerados somem do Estoque. O estoque do produto que não está em
+  nenhum lote (digitado manualmente no cadastro, sem compra) aparece no Estoque como uma linha "Sem lote", então todo produto com
+  estoque aparece e a soma bate com a tela de Produtos. Excluir o produto remove os lotes dele.
+- **Unidade:** lotes e movimentações guardam a unidade do cadastro do produto (`kg`, `pct`, `un`, `cx`) no campo `Unit`.
+  Os campos `AvailableKg`/`AmountKg` têm nome histórico: a quantidade está na unidade de `Unit`, não necessariamente em kg.
+- **PDV:** cada item vendido gera uma movimentação própria, com a quantidade e a unidade reais.
+
+## Vendas: histórico, cancelamento e bloqueio de estoque
+
+- **Histórico** (`GET /api/v1/vendas`, tela *Histórico de Vendas*): cada venda do PDV com cupom, forma de pagamento, desconto, taxa,
+  líquido e os itens (quantidade, unidade e preço efetivamente cobrado, em `SaleItems`). Vendas anteriores ao histórico foram
+  reconstruídas das baixas de estoque (`PriceKnown = false` quando o preço por item não pôde ser deduzido).
+- **Cancelar venda** (`POST /api/v1/vendas/{saleId}/cancelar`, permissão `vendas.cancelar`): devolve o estoque dos itens **ao mesmo lote de onde saíram** (a venda registra em `SaleItemLots` quanto tirou de cada lote, FEFO; kit devolve os
+  componentes), remove o título a receber (cartão ou a prazo), desconta do total gasto do cliente e marca a venda como `cancelada`
+  (ela sai de `/financeiro/vendas` e dos relatórios, mas continua no histórico). Não cancela se o título a receber já foi liquidado nem
+  uma venda já cancelada. Se a venda for antiga (sem registro de lote) ou o lote tiver sido refeito por edição de compra, a quantidade volta para o estoque do produto e aparece como "Sem lote".
+- **Bloqueio de estoque:** `PosService` soma o que cada produto precisa (avulso + componentes dos kits) e recusa a venda (409 "Estoque
+  insuficiente: ...") se passar do saldo. A venda roda em transação com os produtos travados (`FOR UPDATE`), então vendas simultâneas
+  do mesmo estoque não o deixam negativo.
+
+## Custo médio e resultado financeiro
+
+- **Custo médio móvel do estoque** (`Product.CostPrice`): cada compra se mistura ao estoque que já existe na hora,
+  novo custo = (estoque × custo atual + quantidade × custo da compra) ÷ (estoque + quantidade). **A venda não altera o custo.**
+  Editar uma compra tira a contribuição antiga da média e coloca a nova (`PurchaseService.AddToAverageCost/RemoveFromAverageCost`).
+  Estoque vazio assume o custo da compra. Um custo digitado à mão no cadastro vale até a próxima entrada do produto.
+- **Custo na venda:** cada item vendido guarda o custo médio do momento (`SaleItem.UnitCost/TotalCost`; kit = soma dos componentes).
+  Vendas anteriores ao controle foram preenchidas pelo custo médio atual e marcadas `CostEstimated` (aparecem com * na tela).
+  Lucro da venda = valor líquido recebido − custo das mercadorias (`SaleHistoryDto.Profit`).
+- **Resultado (DRE)** (`GET /api/v1/financeiro/resultado?de=&ate=`, aba *Financeiro > Resultado (DRE)*): gasto em entradas (compras, pagas e a pagar,
+  por fornecedor), vendas (bruta, taxas, líquida; canceladas não contam), custo das mercadorias vendidas, lucro bruto e margem,
+  despesas operacionais (contas a pagar da categoria "outros"), folha (salários ativos × meses do período), resultado do período,
+  investimentos/equipamentos (mostrados à parte, fora do resultado), valor do estoque ao custo médio e lucro por produto.
+  O dia da venda é o de Brasília (UTC-3). Entradas só viram custo quando a mercadoria é vendida.
+
 ## Armazenamento de arquivos (Cloudflare R2)
 
 Imagens, vídeos e documentos vão para o Cloudflare R2 (um bucket por ambiente: `gcstock-nprd` e `gcstock-prd`); o banco

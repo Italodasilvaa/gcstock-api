@@ -1,12 +1,15 @@
 using System.Text;
+using GCStock.Api.Authorization;
 using GCStock.Api.Cors;
 using GCStock.Api.Endpoints;
 using GCStock.Api.HealthChecks;
 using GCStock.Application.Abstractions;
+using GCStock.Application.Access;
 using GCStock.Infra.Database;
 using GCStock.Infra.DependencyInjection;
 using GCStock.Infra.Security;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
@@ -49,7 +52,16 @@ builder.Services
         };
     });
 
-builder.Services.AddAuthorization();
+builder.Services.AddAuthorization(options =>
+{
+    // Uma policy por permissão do catálogo; use .RequireAuthorization(Permissions.X) nas rotas.
+    foreach (var permission in Permissions.All)
+    {
+        options.AddPolicy(permission.Key, policy =>
+            policy.RequireAuthenticatedUser().AddRequirements(new PermissionRequirement(permission.Key)));
+    }
+});
+builder.Services.AddScoped<IAuthorizationHandler, PermissionAuthorizationHandler>();
 
 builder.Services.AddCors(options =>
 {
@@ -146,12 +158,14 @@ app.MapHealthChecks("/health", new HealthCheckOptions
 app.MapAuthEndpoints();
 app.MapTenantEndpoints();
 app.MapEmployeeEndpoints();
+app.MapPermissionEndpoints();
 app.MapCatalogEndpoints();
 app.MapInventoryEndpoints();
 app.MapPurchaseEndpoints();
 app.MapFinanceEndpoints();
 app.MapConfiguracoesEndpoints();
 app.MapPdvEndpoints();
+app.MapSalesEndpoints();
 app.MapClientEndpoints();
 app.MapAuditEndpoints();
 app.MapFileEndpoints();

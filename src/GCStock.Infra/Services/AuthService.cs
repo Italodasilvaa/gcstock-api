@@ -1,4 +1,5 @@
 using GCStock.Application.Abstractions;
+using GCStock.Application.Access;
 using GCStock.Application.Auth;
 using GCStock.Domain.Entities;
 using GCStock.Infra.Database;
@@ -11,7 +12,8 @@ public class AuthService(
     GCStockDbContext db,
     IPasswordHasher passwordHasher,
     IJwtTokenService jwtTokenService,
-    ICurrentUserContext currentUser) : IAuthService
+    ICurrentUserContext currentUser,
+    IPermissionChecker permissionChecker) : IAuthService
 {
     public async Task<AuthSessionDto> RegisterCompanyAsync(RegisterCompanyRequest request, CancellationToken ct)
     {
@@ -134,7 +136,8 @@ public class AuthService(
         if (company is null) return null;
 
         var companyDto = await company.ToDtoAsync(db, ct);
-        var user = new AuthUserDto(currentUser.UserId, currentUser.UserName, currentUser.UserEmail, currentUser.Role, currentUser.EmployeeId);
+        var user = new AuthUserDto(currentUser.UserId, currentUser.UserName, currentUser.UserEmail, currentUser.Role, currentUser.EmployeeId,
+            await permissionChecker.GetCurrentAsync(ct));
         return new AuthSessionDto(user, companyDto, string.Empty, DateTime.UtcNow);
     }
 
@@ -151,7 +154,8 @@ public class AuthService(
             EmployeeId: currentUser.EmployeeId));
 
         var companyDto = await company.ToDtoAsync(db, ct);
-        var userDto = new AuthUserDto(currentUser.UserId, currentUser.UserName, currentUser.UserEmail, currentUser.Role, currentUser.EmployeeId);
+        var userDto = new AuthUserDto(currentUser.UserId, currentUser.UserName, currentUser.UserEmail, currentUser.Role, currentUser.EmployeeId,
+            await permissionChecker.GetCurrentAsync(ct));
         return new AuthSessionDto(userDto, companyDto, token, DateTime.UtcNow);
     }
 
@@ -192,7 +196,11 @@ public class AuthService(
             EmployeeId: employeeId));
 
         var companyDto = await company.ToDtoAsync(db, ct);
-        var userDto = new AuthUserDto(resolvedUserId, userName, resolvedEmail, role, employeeId);
+        // Dono: todas as permissões. Funcionário: as cadastradas (lidas do banco, pois o token ainda não existe como contexto).
+        var permissions = employeeId is null
+            ? [.. Permissions.AllKeys]
+            : await db.Employees.Where(e => e.Id == employeeId).Select(e => e.Permissions).FirstOrDefaultAsync(ct) ?? [];
+        var userDto = new AuthUserDto(resolvedUserId, userName, resolvedEmail, role, employeeId, permissions);
         return new AuthSessionDto(userDto, companyDto, token, DateTime.UtcNow);
     }
 }

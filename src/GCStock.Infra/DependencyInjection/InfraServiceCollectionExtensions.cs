@@ -8,6 +8,7 @@ using GCStock.Application.Finance;
 using GCStock.Application.Inventory;
 using GCStock.Application.Pdv;
 using GCStock.Application.Purchasing;
+using GCStock.Application.Sales;
 using GCStock.Application.Storage;
 using GCStock.Application.Tenants;
 using GCStock.Infra.Database;
@@ -38,6 +39,7 @@ public static class InfraServiceCollectionExtensions
 
         services.AddHttpContextAccessor();
         services.AddScoped<ICurrentUserContext, HttpCurrentUserContext>();
+        services.AddScoped<IPermissionChecker, PermissionChecker>();
         services.AddSingleton<IPasswordHasher, BcryptPasswordHasher>();
         services.AddSingleton<IJwtTokenService, JwtTokenService>();
 
@@ -62,6 +64,8 @@ public static class InfraServiceCollectionExtensions
         services.AddScoped<ISalesHistoryService, SalesHistoryService>();
 
         services.AddScoped<IPosService, PosService>();
+        services.AddScoped<ISaleService, SaleService>();
+        services.AddScoped<IFinancialSummaryService, FinancialSummaryService>();
         services.AddScoped<IClientService, ClientService>();
 
         services.Configure<R2Settings>(configuration.GetSection(R2Settings.SectionName));

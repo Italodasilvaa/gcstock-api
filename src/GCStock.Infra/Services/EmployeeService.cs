@@ -1,5 +1,6 @@
 using GCStock.Application.Audit;
 using GCStock.Application.Abstractions;
+using GCStock.Application.Access;
 using GCStock.Application.Employees;
 using GCStock.Domain.Entities;
 using GCStock.Infra.Database;
@@ -20,6 +21,8 @@ public class EmployeeService(GCStockDbContext db, ICurrentUserContext currentUse
 
     public async Task<EmployeeDto> SaveAsync(SaveEmployeeRequest request, CancellationToken ct)
     {
+        var permissions = NormalizePermissions(request.Permissions);
+
         if (request.Id.HasValue)
         {
             var existing = await db.Employees.FirstOrDefaultAsync(e => e.Id == request.Id && e.CompanyId == currentUser.CompanyId, ct);
@@ -31,6 +34,7 @@ public class EmployeeService(GCStockDbContext db, ICurrentUserContext currentUse
                 if (request.Role is not null) existing.Role = request.Role;
                 if (request.Active is not null) existing.Active = request.Active.Value;
                 if (request.Salary is not null) existing.Salary = request.Salary.Value;
+                if (permissions is not null) existing.Permissions = permissions;
 
                 await db.SaveChangesAsync(ct);
                 await audit.RecordAsync("editou", "Funcionário", existing.Name, null, ct);
@@ -47,6 +51,7 @@ public class EmployeeService(GCStockDbContext db, ICurrentUserContext currentUse
             Role = string.IsNullOrWhiteSpace(request.Role) ? "operador" : request.Role,
             Active = request.Active ?? true,
             Salary = request.Salary ?? 0,
+            Permissions = permissions ?? [],
         };
         db.Employees.Add(employee);
         await db.SaveChangesAsync(ct);
@@ -83,6 +88,25 @@ public class EmployeeService(GCStockDbContext db, ICurrentUserContext currentUse
         return ToDto(employee);
     }
 
+    /// <summary>Valida as permissões enviadas: só o dono pode defini-las e todas precisam existir no catálogo.</summary>
+    private List<string>? NormalizePermissions(List<string>? requested)
+    {
+        if (requested is null) return null;
+
+        if (!currentUser.IsOwner)
+        {
+            throw new UnauthorizedAccessException("Somente o dono da empresa pode definir permissões.");
+        }
+
+        var invalid = requested.Where(p => !Permissions.IsValid(p)).ToList();
+        if (invalid.Count > 0)
+        {
+            throw new ArgumentException($"Permissão desconhecida: {string.Join(", ", invalid)}.");
+        }
+
+        return requested.Distinct().ToList();
+    }
+
     private static EmployeeDto ToDto(Employee e) => new(
-        e.Id, e.CompanyId, e.Name, e.Email, e.Role, e.Active, DateOnly.FromDateTime(e.CreatedAt), e.Salary);
+        e.Id, e.CompanyId, e.Name, e.Email, e.Role, e.Active, DateOnly.FromDateTime(e.CreatedAt), e.Salary, e.Permissions);
 }

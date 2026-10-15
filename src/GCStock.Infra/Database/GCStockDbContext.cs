@@ -31,6 +31,8 @@ public class GCStockDbContext(DbContextOptions<GCStockDbContext> options) : DbCo
 
     public DbSet<Client> Clients => Set<Client>();
     public DbSet<SaleRecord> SaleRecords => Set<SaleRecord>();
+    public DbSet<SaleItem> SaleItems => Set<SaleItem>();
+    public DbSet<SaleItemLot> SaleItemLots => Set<SaleItemLot>();
 
     public DbSet<AuditLogEntry> AuditLogEntries => Set<AuditLogEntry>();
 
@@ -71,6 +73,7 @@ public class GCStockDbContext(DbContextOptions<GCStockDbContext> options) : DbCo
             e.Property(x => x.Name).HasMaxLength(200).IsRequired();
             e.Property(x => x.Email).HasMaxLength(256).IsRequired();
             e.Property(x => x.Salary).HasColumnType(moneyType);
+            e.Property(x => x.Permissions).HasColumnType("text[]").HasDefaultValueSql("'{}'");
         });
 
         modelBuilder.Entity<Branch>(e =>
@@ -226,6 +229,29 @@ public class GCStockDbContext(DbContextOptions<GCStockDbContext> options) : DbCo
             e.Property(x => x.Total).HasColumnType(moneyType);
             e.Property(x => x.NetAmount).HasColumnType(moneyType);
             e.Property(x => x.FeeAmount).HasColumnType(moneyType);
+            e.Property(x => x.DiscountAmount).HasColumnType(moneyType);
+            e.Property(x => x.Status).HasMaxLength(20).HasDefaultValue("concluida");
+            e.HasIndex(x => x.SaleId);
+        });
+
+        modelBuilder.Entity<SaleItem>(e =>
+        {
+            e.HasKey(x => x.Id);
+            e.HasOne(x => x.SaleRecord).WithMany(r => r.Items).HasForeignKey(x => x.SaleRecordId).OnDelete(DeleteBehavior.Cascade);
+            e.HasIndex(x => x.SaleRecordId);
+            e.Property(x => x.Qty).HasColumnType(qtyType);
+            e.Property(x => x.UnitPrice).HasColumnType(moneyType);
+            e.Property(x => x.Subtotal).HasColumnType(moneyType);
+            e.Property(x => x.UnitCost).HasColumnType(moneyType);
+            e.Property(x => x.TotalCost).HasColumnType(moneyType);
+        });
+
+        modelBuilder.Entity<SaleItemLot>(e =>
+        {
+            e.HasKey(x => x.Id);
+            e.HasOne(x => x.SaleItem).WithMany(i => i.Lots).HasForeignKey(x => x.SaleItemId).OnDelete(DeleteBehavior.Cascade);
+            e.HasIndex(x => x.SaleItemId);
+            e.Property(x => x.Qty).HasColumnType(qtyType);
         });
 
         modelBuilder.Entity<AuditLogEntry>(e =>

@@ -87,15 +87,20 @@ public class PurchaseService(GCStockDbContext db, ICurrentUserContext currentUse
 
     public async Task<PurchaseEntryDto?> UpdateAsync(Guid id, SavePurchaseRequest request, CancellationToken ct)
     {
+        // A edição desfaz e refaz estoque, lotes, movimentações e itens em vários SaveChanges. A transação garante
+        // tudo-ou-nada (uma falha no meio não deixa o pedido pela metade) e o FOR UPDATE serializa duas edições
+        // simultâneas do mesmo pedido (a segunda espera a primeira terminar, em vez de falhar ou duplicar registros).
+        await using var transaction = await db.Database.BeginTransactionAsync(ct);
+        await db.Database.ExecuteSqlInterpolatedAsync(
+            $"SELECT 1 FROM \"PurchaseEntries\" WHERE \"Id\" = {id} AND \"CompanyId\" = {currentUser.CompanyId} FOR UPDATE", ct);
+
         var existing = await db.PurchaseEntries
             .Include(p => p.Items)
             .FirstOrDefaultAsync(p => p.Id == id && p.CompanyId == currentUser.CompanyId, ct);
         if (existing is null) return null;
 
-        // Compra paga é definitiva: editar mudaria estoque e valores de um título já quitado.
-        if (existing.PaymentStatus == "pago")
-            throw new InvalidOperationException("Esta compra já está paga e não pode mais ser alterada.");
-
+        // Compra paga também pode ser editada (exige a permissão "compras.editar", aplicada na rota). O título de
+        // Contas a Pagar permanece pago (SyncPayable não reabre título quitado), mas o valor acompanha o novo total.
         var newItems = request.Items ?? [];
         // Valida antes de qualquer alteração: o SaveChanges intermediário abaixo já desfaz o estoque antigo.
         ValidateRequest(request.SupplierName ?? existing.SupplierName, request.EntryDate ?? existing.EntryDate, newItems);
@@ -117,6 +122,7 @@ public class PurchaseService(GCStockDbContext db, ICurrentUserContext currentUse
         {
             if (oldItem.ProductId.HasValue && products.TryGetValue(oldItem.ProductId.Value, out var product))
             {
+                RemoveFromAverageCost(product, oldItem.Quantity, oldItem.UnitCost);
                 product.Stock -= oldItem.Quantity;
             }
         }
@@ -156,7 +162,7 @@ public class PurchaseService(GCStockDbContext db, ICurrentUserContext currentUse
             MarkAsPaid(existing, payable);
         }
 
-        existing.Items = newItems.Select(i => new PurchaseItem
+        var rebuiltItems = newItems.Select(i => new PurchaseItem
         {
             ProductId = i.ProductId,
             Name = i.Name,
@@ -169,11 +175,16 @@ public class PurchaseService(GCStockDbContext db, ICurrentUserContext currentUse
             LotNumber = i.LotNumber,
             IsPerishable = i.IsPerishable,
         }).ToList();
+        existing.Items = rebuiltItems;
+        // O Id do item é gerado no construtor; sem o Add explícito o EF o trata como já existente e tenta UPDATE
+        // (DbUpdateConcurrencyException: 0 linhas afetadas). Add marca como inserção.
+        db.PurchaseItems.AddRange(rebuiltItems);
 
         await ApplyItemsToStockAsync(existing, newItems, ct, products, touchedProductIds);
 
         await db.SaveChangesAsync(ct);
         await audit.RecordAsync("editou", "Compra / Entrada", $"{existing.OrderCode} • {existing.SupplierName}", null, ct);
+        await transaction.CommitAsync(ct);
         return ToDto(existing);
     }
 
@@ -261,6 +272,33 @@ public class PurchaseService(GCStockDbContext db, ICurrentUserContext currentUse
     /// a validade "mais próxima" do Produto a partir de TODOS os lotes dele (não só os desta compra) — assim um
     /// lote com validade mais longa nunca esconde um lote mais antigo que ainda está prestes a vencer.
     /// </summary>
+    /// <summary>
+    /// Custo médio móvel do estoque: a entrada se mistura ao que já está no estoque,
+    /// novo custo = (estoque atual × custo atual + quantidade × custo da compra) ÷ (estoque atual + quantidade).
+    /// A venda não altera o custo; ela sai pelo custo médio do momento (ver PosService).
+    /// </summary>
+    private static void AddToAverageCost(Product product, decimal quantity, decimal unitCost)
+    {
+        var stockBefore = Math.Max(0, product.Stock);
+        var total = stockBefore + quantity;
+        product.CostPrice = total > 0
+            ? Math.Round((stockBefore * product.CostPrice + quantity * unitCost) / total, 2)
+            : unitCost;
+    }
+
+    /// <summary>
+    /// Desfaz a contribuição de um item de compra (usado ao editar/trocar os itens de um pedido): tira a quantidade
+    /// e o valor daquele item da média do estoque atual. Se não sobra estoque, o custo atual fica até a próxima entrada.
+    /// </summary>
+    private static void RemoveFromAverageCost(Product product, decimal quantity, decimal unitCost)
+    {
+        var remaining = product.Stock - quantity;
+        if (product.Stock <= 0 || remaining <= 0) return;
+
+        var value = product.Stock * product.CostPrice - quantity * unitCost;
+        product.CostPrice = Math.Round(Math.Max(0, value / remaining), 2);
+    }
+
     private async Task ApplyItemsToStockAsync(
         PurchaseEntry entry,
         List<PurchaseItemDto> items,
@@ -289,8 +327,8 @@ public class PurchaseService(GCStockDbContext db, ICurrentUserContext currentUse
             var expiryDate = item.ExpiryDate ?? DateOnly.FromDateTime(now).AddYears(1);
             var daysRemaining = expiryDate.DayNumber - DateOnly.FromDateTime(now).DayNumber;
 
+            AddToAverageCost(product, item.Quantity, item.UnitCost);
             product.Stock += item.Quantity;
-            product.CostPrice = item.UnitCost;
             product.Supplier = entry.SupplierName;
 
             var batch = new StockBatch
@@ -301,6 +339,7 @@ public class PurchaseService(GCStockDbContext db, ICurrentUserContext currentUse
                 Sku = item.Code,
                 LotNumber = item.LotNumber,
                 AvailableKg = item.Quantity,
+                Unit = product.Unit,
                 EntryDate = entry.EntryDate,
                 ExpiryDate = expiryDate,
                 DaysRemaining = daysRemaining,
@@ -327,6 +366,7 @@ public class PurchaseService(GCStockDbContext db, ICurrentUserContext currentUse
                 Title = $"Entrada: {item.Name}",
                 DocInfo = $"NF-e {entry.NfeNumber}",
                 AmountKg = item.Quantity,
+                Unit = product.Unit,
                 Description = $"Compra {entry.OrderCode} • Fornecedor {entry.SupplierName}",
                 BadgeLabel = "Compra",
                 AuditLink = entry.OrderCode,
@@ -366,6 +406,9 @@ public class PurchaseService(GCStockDbContext db, ICurrentUserContext currentUse
             product.ExpiryDaysRemaining = daysRemaining;
             product.ExpiryStatus = daysRemaining < 0 ? "vencido" : daysRemaining <= product.AlertDays ? "critico" : daysRemaining <= 30 ? "normal" : "longo";
         }
+
+        // Lotes não podem somar mais que o estoque do produto (ex.: compra editada depois de vendas já feitas).
+        await StockLots.ReconcileAsync(db, currentUser.CompanyId, [.. productIdsToRecompute.Where(products.ContainsKey).Select(id => products[id])], ct);
     }
 
     private static PurchaseEntryDto ToDto(PurchaseEntry p) => new(

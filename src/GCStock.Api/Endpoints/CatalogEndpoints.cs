@@ -1,3 +1,4 @@
+using GCStock.Application.Access;
 using GCStock.Application.Catalog;
 
 namespace GCStock.Api.Endpoints;
@@ -12,16 +13,16 @@ public static class CatalogEndpoints
             Results.Ok(await service.GetAllAsync(ct)));
 
         products.MapPost("/", async (SaveProductRequest request, IProductService service, CancellationToken ct) =>
-            Results.Created("/api/v1/produtos", await service.SaveAsync(request, ct)));
+            Results.Created("/api/v1/produtos", await service.SaveAsync(request, ct))).RequireAuthorization(Permissions.ProductsCreate);
 
         products.MapPut("/{id:guid}", async (Guid id, SaveProductRequest request, IProductService service, CancellationToken ct) =>
-            Results.Ok(await service.SaveAsync(request with { Id = id }, ct)));
+            Results.Ok(await service.SaveAsync(request with { Id = id }, ct))).RequireAuthorization(Permissions.ProductsEdit);
 
         products.MapDelete("/{id:guid}", async (Guid id, IProductService service, CancellationToken ct) =>
         {
             await service.DeleteAsync(id, ct);
             return Results.NoContent();
-        });
+        }).RequireAuthorization(Permissions.ProductsDelete);
 
         var categories = app.MapGroup("/api/v1/categorias-produto").WithTags("Categorias de Produto").RequireAuthorization();
 
@@ -39,10 +40,10 @@ public static class CatalogEndpoints
             {
                 return Results.BadRequest(new { message = ex.Message });
             }
-        });
+        }).RequireAuthorization(Permissions.CategoriesCreate);
 
         categories.MapPut("/ordem", async (ReorderCategoriesRequest request, ICategoryService service, CancellationToken ct) =>
-            Results.Ok(await service.ReorderAsync(request, ct)));
+            Results.Ok(await service.ReorderAsync(request, ct))).RequireAuthorization(Permissions.CategoriesEdit);
 
         categories.MapPut("/{id:guid}", async (Guid id, SaveCategoryRequest request, ICategoryService service, CancellationToken ct) =>
         {
@@ -55,7 +56,7 @@ public static class CatalogEndpoints
             {
                 return Results.BadRequest(new { message = ex.Message });
             }
-        });
+        }).RequireAuthorization(Permissions.CategoriesEdit);
 
         categories.MapDelete("/{id:guid}", async (Guid id, ICategoryService service, CancellationToken ct) =>
         {
@@ -67,7 +68,7 @@ public static class CatalogEndpoints
             {
                 return Results.Conflict(new { message = ex.Message });
             }
-        });
+        }).RequireAuthorization(Permissions.CategoriesDelete);
 
         var kits = app.MapGroup("/api/v1/kits-churrasco").WithTags("Kits").RequireAuthorization();
 
@@ -75,15 +76,15 @@ public static class CatalogEndpoints
             Results.Ok(await service.GetAllAsync(ct)));
 
         kits.MapPost("/", async (SaveKitRequest request, IKitService service, CancellationToken ct) =>
-            Results.Created("/api/v1/kits-churrasco", await service.SaveAsync(request, ct)));
+            Results.Created("/api/v1/kits-churrasco", await service.SaveAsync(request, ct))).RequireAuthorization(Permissions.KitsCreate);
 
         kits.MapPut("/{id:guid}", async (Guid id, SaveKitRequest request, IKitService service, CancellationToken ct) =>
-            Results.Ok(await service.SaveAsync(request with { Id = id }, ct)));
+            Results.Ok(await service.SaveAsync(request with { Id = id }, ct))).RequireAuthorization(Permissions.KitsEdit);
 
         kits.MapDelete("/{id:guid}", async (Guid id, IKitService service, CancellationToken ct) =>
         {
             await service.DeleteAsync(id, ct);
             return Results.NoContent();
-        });
+        }).RequireAuthorization(Permissions.KitsDelete);
     }
 }

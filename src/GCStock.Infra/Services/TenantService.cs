@@ -1,4 +1,5 @@
 using GCStock.Application.Abstractions;
+using GCStock.Application.Access;
 using GCStock.Application.Auth;
 using GCStock.Application.Tenants;
 using GCStock.Infra.Database;
@@ -47,7 +48,7 @@ public class TenantService(
             AdministratorId: admin.Id, EmployeeId: null));
 
         var companyDto = await target.ToDtoAsync(db, ct);
-        var userDto = new AuthUserDto(currentUser.UserId, currentUser.UserName, currentUser.UserEmail, currentUser.Role, null);
+        var userDto = new AuthUserDto(currentUser.UserId, currentUser.UserName, currentUser.UserEmail, currentUser.Role, null, [.. Permissions.AllKeys]);
         return new AuthSessionDto(userDto, companyDto, token, DateTime.UtcNow);
     }
 

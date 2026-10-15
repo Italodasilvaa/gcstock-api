@@ -12,7 +12,8 @@ public record StockBatchDto(
     int DaysRemaining,
     string FiscalDoc,
     string Supplier,
-    string Status);
+    string Status,
+    string Unit);
 
 public record StockMovementDto(
     Guid Id,
@@ -23,7 +24,8 @@ public record StockMovementDto(
     decimal AmountKg,
     string Description,
     string BadgeLabel,
-    string AuditLink);
+    string AuditLink,
+    string Unit);
 
 public interface IInventoryService
 {

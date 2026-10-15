@@ -48,6 +48,9 @@ public class Employee
 
     /// <summary>Salário mensal — somado automaticamente ao fechamento mensal (Financeiro &amp; DRE &gt; Visão Mensal).</summary>
     public decimal Salary { get; set; }
+
+    /// <summary>Permissões granulares (chaves de GCStock.Application.Access.Permissions), ex.: "compras.editar". O dono da empresa não precisa: tem todas.</summary>
+    public List<string> Permissions { get; set; } = [];
 }
 
 /// <summary>Type: "matriz" | "filial" | "cd".</summary>

@@ -10,7 +10,7 @@ public class SalesHistoryService(GCStockDbContext db, ICurrentUserContext curren
     public async Task<List<SaleRecordDto>> GetAllAsync(CancellationToken ct)
     {
         return await db.SaleRecords
-            .Where(s => s.CompanyId == currentUser.CompanyId)
+            .Where(s => s.CompanyId == currentUser.CompanyId && s.Status != "cancelada")
             .OrderByDescending(s => s.Timestamp)
             .Select(s => new SaleRecordDto(
                 s.Id, s.SaleId, s.Timestamp, s.Total, s.NetAmount, s.FeeAmount, s.PaymentMode, s.ClientName, s.SoldBy))

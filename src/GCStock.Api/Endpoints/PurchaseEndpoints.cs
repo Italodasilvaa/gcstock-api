@@ -1,3 +1,4 @@
+using GCStock.Application.Access;
 using GCStock.Application.Purchasing;
 
 namespace GCStock.Api.Endpoints;
@@ -21,7 +22,7 @@ public static class PurchaseEndpoints
             {
                 return Results.BadRequest(new { message = ex.Message });
             }
-        });
+        }).RequireAuthorization(Permissions.PurchasesCreate);
 
         group.MapPut("/{id:guid}", async (Guid id, SavePurchaseRequest request, IPurchaseService service, CancellationToken ct) =>
         {
@@ -36,9 +37,8 @@ public static class PurchaseEndpoints
             }
             catch (InvalidOperationException ex)
             {
-                // Compra já paga: não pode mais ser alterada.
                 return Results.Conflict(new { message = ex.Message });
             }
-        });
+        }).RequireAuthorization(Permissions.PurchasesEdit); // editar pedido exige a permissão "compras.editar" (dono tem sempre)
     }
 }

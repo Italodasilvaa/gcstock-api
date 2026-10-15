@@ -44,6 +44,8 @@ public class ProductService(GCStockDbContext db, ICurrentUserContext currentUser
                 if (request.SubLocation is not null) existing.SubLocation = request.SubLocation;
                 if (request.IsPromo is not null) existing.IsPromo = request.IsPromo.Value;
 
+                // Ajuste manual do estoque: os lotes não podem somar mais que o novo estoque do produto.
+                await StockLots.ReconcileAsync(db, currentUser.CompanyId, [existing], ct);
                 await db.SaveChangesAsync(ct);
                 await categories.EnsureExistsAsync(existing.Category, ct);
                 await audit.RecordAsync("editou", "Produto", existing.Name, null, ct);
@@ -92,6 +94,8 @@ public class ProductService(GCStockDbContext db, ICurrentUserContext currentUser
         var target = await db.Products.FirstOrDefaultAsync(p => p.Id == id && p.CompanyId == currentUser.CompanyId, ct);
         if (target is null) return;
 
+        // Sem o produto, os lotes dele não podem continuar aparecendo no Estoque.
+        db.StockBatches.RemoveRange(await db.StockBatches.Where(x => x.ProductId == id && x.CompanyId == currentUser.CompanyId).ToListAsync(ct));
         db.Products.Remove(target);
         await db.SaveChangesAsync(ct);
         await audit.RecordAsync("excluiu", "Produto", target.Name, null, ct);

@@ -8,7 +8,8 @@ public record EmployeeDto(
     string Role,
     bool Active,
     DateOnly CreatedAt,
-    decimal Salary);
+    decimal Salary,
+    List<string> Permissions);
 
 public record SaveEmployeeRequest(
     Guid? Id,
@@ -17,4 +18,6 @@ public record SaveEmployeeRequest(
     string? Password,
     string? Role,
     bool? Active,
-    decimal? Salary);
+    decimal? Salary,
+    // null = não altera. Só o dono da empresa pode definir (lista vazia remove todas).
+    List<string>? Permissions = null);
