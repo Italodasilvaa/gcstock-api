@@ -19,6 +19,8 @@ public class GCStockDbContext(DbContextOptions<GCStockDbContext> options) : DbCo
 
     public DbSet<StockBatch> StockBatches => Set<StockBatch>();
     public DbSet<StockMovement> StockMovements => Set<StockMovement>();
+    public DbSet<StockLoss> StockLosses => Set<StockLoss>();
+    public DbSet<StockLossLot> StockLossLots => Set<StockLossLot>();
 
     public DbSet<PurchaseEntry> PurchaseEntries => Set<PurchaseEntry>();
     public DbSet<PurchaseItem> PurchaseItems => Set<PurchaseItem>();
@@ -138,6 +140,25 @@ public class GCStockDbContext(DbContextOptions<GCStockDbContext> options) : DbCo
             e.HasOne(x => x.Company).WithMany().HasForeignKey(x => x.CompanyId).OnDelete(DeleteBehavior.Cascade);
             e.HasIndex(x => x.CompanyId);
             e.Property(x => x.AmountKg).HasColumnType(qtyType);
+        });
+
+        modelBuilder.Entity<StockLoss>(e =>
+        {
+            e.HasKey(x => x.Id);
+            e.HasOne(x => x.Company).WithMany().HasForeignKey(x => x.CompanyId).OnDelete(DeleteBehavior.Cascade);
+            e.HasIndex(x => new { x.CompanyId, x.Date });
+            e.Property(x => x.Qty).HasColumnType(qtyType);
+            e.Property(x => x.UnitCost).HasColumnType(moneyType);
+            e.Property(x => x.TotalCost).HasColumnType(moneyType);
+            e.Property(x => x.Status).HasMaxLength(20).HasDefaultValue("ativa");
+        });
+
+        modelBuilder.Entity<StockLossLot>(e =>
+        {
+            e.HasKey(x => x.Id);
+            e.HasOne(x => x.StockLoss).WithMany(l => l.Lots).HasForeignKey(x => x.StockLossId).OnDelete(DeleteBehavior.Cascade);
+            e.HasIndex(x => x.StockLossId);
+            e.Property(x => x.Qty).HasColumnType(qtyType);
         });
 
         modelBuilder.Entity<PurchaseEntry>(e =>

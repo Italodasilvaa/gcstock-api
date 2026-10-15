@@ -166,6 +166,7 @@ app.MapFinanceEndpoints();
 app.MapConfiguracoesEndpoints();
 app.MapPdvEndpoints();
 app.MapSalesEndpoints();
+app.MapLossEndpoints();
 app.MapClientEndpoints();
 app.MapAuditEndpoints();
 app.MapFileEndpoints();

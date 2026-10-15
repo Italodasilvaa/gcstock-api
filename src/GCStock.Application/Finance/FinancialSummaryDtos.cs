@@ -16,6 +16,8 @@ public record ProductProfitDto(
 
 public record ExpenseCategoryDto(string Category, decimal Amount);
 
+public record LossReasonDto(string Reason, string Label, int Count, decimal Amount);
+
 /// <summary>
 /// Situação financeira de um período: o que foi gasto em entradas (compras), o que foi vendido, o custo das
 /// mercadorias vendidas, o lucro bruto e o resultado depois das despesas e da folha.
@@ -43,6 +45,10 @@ public record FinancialSummaryDto(
     decimal GrossMarginPercent,
     decimal OperatingExpenses,
     decimal Payroll,
+    // Perdas de estoque (vencimento, quebra...): prejuízo = quantidade × custo informado
+    decimal Losses,
+    int LossCount,
+    List<LossReasonDto> LossesByReason,
     decimal NetResult,
     // Investimentos (equipamentos etc.): aparecem, mas não entram no resultado do período
     decimal CapitalExpenses,

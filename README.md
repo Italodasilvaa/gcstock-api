@@ -280,6 +280,16 @@ troca e transferência entre empresas (só o dono, validado no serviço) e uploa
   insuficiente: ...") se passar do saldo. A venda roda em transação com os produtos travados (`FOR UPDATE`), então vendas simultâneas
   do mesmo estoque não o deixam negativo.
 
+## Perdas de estoque
+
+- **Registrar perda** (`POST /api/v1/estoque/perdas`, permissão `perdas.registrar`): motivo `vencimento`, `quebra`, `furto` ou `outros`.
+  Abate a quantidade do estoque (do lote escolhido ou, sem lote, do que vence primeiro) e grava o **prejuízo = quantidade × custo informado**;
+  sem custo informado usa o custo médio atual. O custo médio do que sobra **não muda**. Recusa (409) quantidade maior que o estoque/lote.
+- **Desfazer** (`DELETE /api/v1/estoque/perdas/{id}`, permissão `perdas.desfazer`): devolve ao mesmo lote e marca a perda como `desfeita`.
+- `GET /api/v1/estoque/perdas` lista as perdas; aparecem em Movimentações (`perda_quebra`) e no resultado (`/financeiro/resultado`:
+  `losses`, `lossCount`, `lossesByReason`; `netResult` já desconta as perdas ativas).
+- Migration `AddStockLosses` (tabelas `StockLosses` e `StockLossLots`).
+
 ## Custo médio e resultado financeiro
 
 - **Custo médio móvel do estoque** (`Product.CostPrice`): cada compra se mistura ao estoque que já existe na hora,

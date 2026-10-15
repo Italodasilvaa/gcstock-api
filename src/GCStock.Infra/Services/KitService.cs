@@ -41,7 +41,11 @@ public class KitService(GCStockDbContext db, ICurrentUserContext currentUser, IA
                 if (request.Components is not null)
                 {
                     db.KitComponents.RemoveRange(existing.Components);
-                    existing.Components = request.Components.Select(ToEntity).ToList();
+                    var rebuilt = request.Components.Select(ToEntity).ToList();
+                    existing.Components = rebuilt;
+                    // O Id do componente é gerado no construtor; sem o Add explícito o EF o trata como já existente e
+                    // tenta UPDATE (DbUpdateConcurrencyException: 0 linhas afetadas). Add marca como inserção.
+                    db.KitComponents.AddRange(rebuilt);
                 }
 
                 await db.SaveChangesAsync(ct);

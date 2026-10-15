@@ -1119,6 +1119,101 @@ namespace GCStock.Infra.Database.Migrations
                     b.ToTable("StockBatches");
                 });
 
+            modelBuilder.Entity("GCStock.Domain.Entities.StockLoss", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("CompanyId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("CreatedBy")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<DateOnly>("Date")
+                        .HasColumnType("date");
+
+                    b.Property<string>("LotNumber")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("Notes")
+                        .HasColumnType("text");
+
+                    b.Property<Guid>("ProductId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ProductName")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<decimal>("Qty")
+                        .HasColumnType("decimal(18,3)");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasDefaultValue("ativa");
+
+                    b.Property<Guid?>("StockBatchId")
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("TotalCost")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<DateTime?>("UndoneAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("UndoneBy")
+                        .HasColumnType("text");
+
+                    b.Property<string>("Unit")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<decimal>("UnitCost")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CompanyId", "Date");
+
+                    b.ToTable("StockLosses");
+                });
+
+            modelBuilder.Entity("GCStock.Domain.Entities.StockLossLot", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("Qty")
+                        .HasColumnType("decimal(18,3)");
+
+                    b.Property<Guid>("StockBatchId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("StockLossId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("StockLossId");
+
+                    b.ToTable("StockLossLots");
+                });
+
             modelBuilder.Entity("GCStock.Domain.Entities.StockMovement", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1392,6 +1487,28 @@ namespace GCStock.Infra.Database.Migrations
                     b.Navigation("Company");
                 });
 
+            modelBuilder.Entity("GCStock.Domain.Entities.StockLoss", b =>
+                {
+                    b.HasOne("GCStock.Domain.Entities.Company", "Company")
+                        .WithMany()
+                        .HasForeignKey("CompanyId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Company");
+                });
+
+            modelBuilder.Entity("GCStock.Domain.Entities.StockLossLot", b =>
+                {
+                    b.HasOne("GCStock.Domain.Entities.StockLoss", "StockLoss")
+                        .WithMany("Lots")
+                        .HasForeignKey("StockLossId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("StockLoss");
+                });
+
             modelBuilder.Entity("GCStock.Domain.Entities.StockMovement", b =>
                 {
                     b.HasOne("GCStock.Domain.Entities.Company", "Company")
@@ -1426,6 +1543,11 @@ namespace GCStock.Infra.Database.Migrations
             modelBuilder.Entity("GCStock.Domain.Entities.SaleRecord", b =>
                 {
                     b.Navigation("Items");
+                });
+
+            modelBuilder.Entity("GCStock.Domain.Entities.StockLoss", b =>
+                {
+                    b.Navigation("Lots");
                 });
 #pragma warning restore 612, 618
         }

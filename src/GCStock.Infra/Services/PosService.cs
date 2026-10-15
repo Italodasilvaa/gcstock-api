@@ -148,10 +148,10 @@ public class PosService(GCStockDbContext db, ICurrentUserContext currentUser, IA
                 Qty = line.Qty,
                 Unit = lineUnit,
                 UnitPrice = line.Price,
-                Subtotal = Math.Round(line.Qty * line.Price, 2),
+                Subtotal = Math.Round(line.Qty * line.Price, 2, MidpointRounding.AwayFromZero),
                 PriceKnown = true,
                 UnitCost = unitCost,
-                TotalCost = Math.Round(line.Qty * unitCost, 2),
+                TotalCost = Math.Round(line.Qty * unitCost, 2, MidpointRounding.AwayFromZero),
             });
 
             db.StockMovements.Add(new StockMovement

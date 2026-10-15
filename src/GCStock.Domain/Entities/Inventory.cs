@@ -46,3 +46,53 @@ public class StockMovement
     /// <summary>Compra de origem deste movimento — permite removê-lo quando a compra é editada.</summary>
     public Guid? PurchaseEntryId { get; set; }
 }
+
+/// <summary>
+/// Perda de estoque (vencimento, quebra, furto...) com o valor do prejuízo: quantidade × custo unitário informado.
+/// Status: "ativa" | "desfeita" (desfeita devolveu a quantidade ao estoque e não conta no resultado).
+/// </summary>
+public class StockLoss
+{
+    public Guid Id { get; set; } = Guid.CreateVersion7();
+    public Guid CompanyId { get; set; }
+    public Company? Company { get; set; }
+
+    /// <summary>Dia da perda (data local); é o que define o mês do prejuízo no resultado.</summary>
+    public DateOnly Date { get; set; }
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+
+    public Guid ProductId { get; set; }
+    public string ProductName { get; set; } = string.Empty;
+    public decimal Qty { get; set; }
+    public string Unit { get; set; } = "kg";
+
+    /// <summary>Custo unitário da perda (o do lote perdido, ou o custo médio quando não informado).</summary>
+    public decimal UnitCost { get; set; }
+    public decimal TotalCost { get; set; }
+
+    /// <summary>"vencimento" | "quebra" | "furto" | "outros".</summary>
+    public string Reason { get; set; } = "outros";
+    public string? Notes { get; set; }
+
+    public Guid? StockBatchId { get; set; }
+    public string LotNumber { get; set; } = string.Empty;
+    public string CreatedBy { get; set; } = string.Empty;
+
+    public string Status { get; set; } = "ativa";
+    public DateTime? UndoneAt { get; set; }
+    public string? UndoneBy { get; set; }
+
+    /// <summary>De quais lotes saiu a quantidade (para devolver ao mesmo lote se a perda for desfeita).</summary>
+    public List<StockLossLot> Lots { get; set; } = [];
+}
+
+/// <summary>Quantidade de uma perda que saiu de um lote. Sem FK para o lote: ele pode ser refeito por edição de compra.</summary>
+public class StockLossLot
+{
+    public Guid Id { get; set; } = Guid.CreateVersion7();
+    public Guid StockLossId { get; set; }
+    public StockLoss? StockLoss { get; set; }
+
+    public Guid StockBatchId { get; set; }
+    public decimal Qty { get; set; }
+}

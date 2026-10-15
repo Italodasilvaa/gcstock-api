@@ -66,6 +66,7 @@ public static class InfraServiceCollectionExtensions
         services.AddScoped<IPosService, PosService>();
         services.AddScoped<ISaleService, SaleService>();
         services.AddScoped<IFinancialSummaryService, FinancialSummaryService>();
+        services.AddScoped<IStockLossService, StockLossService>();
         services.AddScoped<IClientService, ClientService>();
 
         services.Configure<R2Settings>(configuration.GetSection(R2Settings.SectionName));

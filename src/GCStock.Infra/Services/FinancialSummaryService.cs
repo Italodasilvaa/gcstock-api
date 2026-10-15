@@ -1,5 +1,6 @@
 using GCStock.Application.Abstractions;
 using GCStock.Application.Finance;
+using GCStock.Application.Inventory;
 using GCStock.Infra.Database;
 using Microsoft.EntityFrameworkCore;
 
@@ -65,6 +66,18 @@ public class FinancialSummaryService(GCStockDbContext db, ICurrentUserContext cu
         var monthsTouched = (to.Year - from.Year) * 12 + to.Month - from.Month + 1;
         var payroll = monthlyPayroll * monthsTouched;
 
+        // ---------- Perdas de estoque (desfeitas não contam)
+        var losses = await db.StockLosses
+            .Where(l => l.CompanyId == companyId && l.Status == "ativa" && l.Date >= from && l.Date <= to)
+            .Select(l => new { l.Reason, l.TotalCost })
+            .ToListAsync(ct);
+        var lossesTotal = losses.Sum(l => l.TotalCost);
+        var lossesByReason = losses
+            .GroupBy(l => l.Reason)
+            .Select(g => new LossReasonDto(g.Key, LossReasons.Label(g.Key), g.Count(), g.Sum(x => x.TotalCost)))
+            .OrderByDescending(x => x.Amount)
+            .ToList();
+
         // ---------- Valor do estoque ao custo médio atual
         var stockValue = await db.Products
             .Where(p => p.CompanyId == companyId && p.Stock > 0)
@@ -87,7 +100,7 @@ public class FinancialSummaryService(GCStockDbContext db, ICurrentUserContext cu
             .OrderByDescending(x => x.Profit)
             .ToList();
 
-        var netResult = grossProfit - operatingExpenses - payroll;
+        var netResult = grossProfit - operatingExpenses - payroll - lossesTotal;
 
         return new FinancialSummaryDto(
             from, to,
@@ -108,6 +121,9 @@ public class FinancialSummaryService(GCStockDbContext db, ICurrentUserContext cu
             netRevenue > 0 ? Math.Round(grossProfit / netRevenue * 100, 1) : 0,
             operatingExpenses,
             payroll,
+            lossesTotal,
+            losses.Count,
+            lossesByReason,
             netResult,
             capitalExpenses,
             expenses,
