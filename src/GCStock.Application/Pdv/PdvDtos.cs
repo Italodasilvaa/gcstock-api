@@ -8,7 +8,9 @@ public record PosSaleItem(
     // Informado quando o item vendido é um produto avulso do catálogo — a venda baixa Qty do estoque dele.
     Guid? ProductId = null,
     // Informado quando o item vendido é um Kit de Churrasco — a venda baixa (Qty * quantidade do componente) de cada produto que compõe o kit.
-    Guid? KitId = null);
+    Guid? KitId = null,
+    // Lote de onde o produto avulso sai (opcional): o custo do item passa a ser o do lote, para o lucro real. Vazio = sai do pedido mais antigo, a custo médio.
+    Guid? StockBatchId = null);
 
 public record FinalizeSaleRequest(
     decimal Total,

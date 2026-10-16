@@ -20,7 +20,8 @@ public class InventoryService(GCStockDbContext db, ICurrentUserContext currentUs
             .OrderBy(b => b.ExpiryDate)
             .Select(b => new StockBatchDto(
                 b.Id, b.ProductId, b.ProductName, b.Sku, b.LotNumber, b.AvailableKg,
-                b.EntryDate, b.ExpiryDate, b.DaysRemaining, b.FiscalDoc, b.Supplier, b.Status, b.Unit))
+                b.EntryDate, b.ExpiryDate, b.DaysRemaining, b.FiscalDoc, b.Supplier, b.Status, b.Unit, b.UnitCost,
+                db.PurchaseEntries.Where(p => p.Id == b.PurchaseEntryId).Select(p => p.OrderCode).FirstOrDefault() ?? ""))
             .ToListAsync(ct);
 
         var batchedByProduct = batches
@@ -46,7 +47,7 @@ public class InventoryService(GCStockDbContext db, ICurrentUserContext currentUs
                     : product.ExpiryStatus == "critico" ? "urgente"
                     : product.ExpiryStatus == "normal" ? "regular"
                     : "novo",
-                product.Unit));
+                product.Unit, product.CostPrice));
         }
 
         return batches.OrderBy(b => b.ExpiryDate).ToList();

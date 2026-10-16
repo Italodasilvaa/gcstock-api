@@ -13,7 +13,9 @@ public static class FinanceEndpoints
             Results.Ok(await service.GetAllAsync(ct)));
 
         group.MapPost("/contas-a-pagar", async (AddPayableRequest request, IPayableService service, CancellationToken ct) =>
-            Results.Created("/api/v1/financeiro/contas-a-pagar", await service.AddAsync(request, ct))).RequireAuthorization(Permissions.PayablesCreate);
+            request.Category == "investimento"
+                ? Results.BadRequest(new { message = "Investimento agora é um aporte de capital: lance em Gestão da Empresa > Aportes (entra no caixa como valor positivo)." })
+                : Results.Created("/api/v1/financeiro/contas-a-pagar", await service.AddAsync(request, ct))).RequireAuthorization(Permissions.PayablesCreate);
 
         group.MapPost("/contas-a-pagar/{id:guid}/baixar", async (Guid id, SettlePayableRequest request, IPayableService service, CancellationToken ct) =>
         {
@@ -49,6 +51,50 @@ public static class FinanceEndpoints
             var from = de ?? new DateOnly(today.Year, today.Month, 1);
             var to = ate ?? from.AddMonths(1).AddDays(-1);
             return Results.Ok(await service.GetAsync(from, to, ct));
+        });
+
+        // Caixa da empresa (regime de caixa): saldo, entradas, saídas e extrato do período. Padrão: mês atual.
+        group.MapGet("/caixa", async (DateOnly? de, DateOnly? ate, ICashService service, CancellationToken ct) =>
+        {
+            var today = DateOnly.FromDateTime(DateTime.UtcNow.AddHours(-3));
+            var from = de ?? new DateOnly(today.Year, today.Month, 1);
+            var to = ate ?? from.AddMonths(1).AddDays(-1);
+            return Results.Ok(await service.GetAsync(from, to, ct));
+        });
+
+        group.MapGet("/aportes", async (ICashService service, CancellationToken ct) =>
+            Results.Ok(await service.GetContributionsAsync(ct)));
+
+        group.MapPost("/aportes", async (AddCapitalContributionRequest request, ICashService service, CancellationToken ct) =>
+        {
+            try
+            {
+                return Results.Created("/api/v1/financeiro/aportes", await service.AddContributionAsync(request, ct));
+            }
+            catch (ArgumentException ex)
+            {
+                return Results.BadRequest(new { message = ex.Message });
+            }
+        }).RequireAuthorization(Permissions.CapitalManage);
+
+        group.MapDelete("/aportes/{id:guid}", async (Guid id, ICashService service, CancellationToken ct) =>
+            await service.DeleteContributionAsync(id, ct) ? Results.NoContent() : Results.NotFound())
+            .RequireAuthorization(Permissions.CapitalManage);
+
+        // Balanço mês a mês de um ano (padrão: ano atual).
+        group.MapGet("/balanco-mensal", async (int? ano, IFinancialSummaryService service, CancellationToken ct) =>
+        {
+            var year = ano ?? DateTime.UtcNow.AddHours(-3).Year;
+            return Results.Ok(await service.GetMonthlyAsync(year, ct));
+        });
+
+        // Lucro por lote no período (vendas e perdas do período; padrão: mês atual).
+        group.MapGet("/lucro-por-lote", async (DateOnly? de, DateOnly? ate, IFinancialSummaryService service, CancellationToken ct) =>
+        {
+            var today = DateOnly.FromDateTime(DateTime.UtcNow.AddHours(-3));
+            var from = de ?? new DateOnly(today.Year, today.Month, 1);
+            var to = ate ?? from.AddMonths(1).AddDays(-1);
+            return Results.Ok(await service.GetLotProfitsAsync(from, to, ct));
         });
 
         group.MapGet("/vendas", async (ISalesHistoryService service, CancellationToken ct) =>

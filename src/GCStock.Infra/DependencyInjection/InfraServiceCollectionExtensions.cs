@@ -66,6 +66,7 @@ public static class InfraServiceCollectionExtensions
         services.AddScoped<IPosService, PosService>();
         services.AddScoped<ISaleService, SaleService>();
         services.AddScoped<IFinancialSummaryService, FinancialSummaryService>();
+        services.AddScoped<ICashService, CashService>();
         services.AddScoped<IStockLossService, StockLossService>();
         services.AddScoped<IClientService, ClientService>();
 

@@ -50,6 +50,9 @@ public static class Permissions
     public const string LossesCreate = "perdas.registrar";
     public const string LossesUndo = "perdas.desfazer";
 
+    // Caixa da empresa
+    public const string CapitalManage = "aportes.gerenciar";
+
     // Financeiro
     public const string PayablesCreate = "contas-pagar.criar";
     public const string PayablesSettle = "contas-pagar.baixar";
@@ -92,6 +95,8 @@ public static class Permissions
 
         new(LossesCreate, "Registrar perdas", "Lançar perdas de estoque (vencimento, quebra, furto...) com o valor do prejuízo; abate do estoque.", "Perdas e quebras"),
         new(LossesUndo, "Desfazer perdas", "Desfazer uma perda lançada por engano; devolve a quantidade ao estoque.", "Perdas e quebras"),
+
+        new(CapitalManage, "Lançar aportes no caixa", "Registrar e excluir aportes de capital (dinheiro colocado na empresa).", "Caixa da empresa"),
 
         new(PayablesCreate, "Lançar contas a pagar", "Criar títulos de contas a pagar.", "Contas a pagar"),
         new(PayablesSettle, "Dar baixa em contas a pagar", "Marcar contas a pagar como pagas.", "Contas a pagar"),

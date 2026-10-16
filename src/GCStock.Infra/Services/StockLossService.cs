@@ -47,7 +47,7 @@ public class StockLossService(GCStockDbContext db, ICurrentUserContext currentUs
                 $"Estoque insuficiente: {product.Name} tem {Format(Math.Max(0, product.Stock))} {product.Unit} e a perda é de {Format(request.Qty)} {product.Unit}.");
         }
 
-        // Lote perdido: o escolhido pelo usuário ou, sem escolha, o que vence primeiro (FEFO).
+        // Lote perdido: o escolhido pelo usuário ou, sem escolha, o pedido mais antigo.
         var consumption = new List<(Guid LotId, decimal Qty)>();
         var lotNumber = string.Empty;
         if (request.StockBatchId is { } lotId)

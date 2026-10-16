@@ -59,7 +59,48 @@ public record FinancialSummaryDto(
     List<ProductProfitDto> ProductProfits,
     int EstimatedCostItems);
 
+/// <summary>Um mês do balanço: o mesmo cálculo do resultado do período, mês a mês.</summary>
+public record MonthlyBalanceDto(
+    int Month,
+    int SalesCount,
+    decimal NetRevenue,
+    decimal CostOfGoodsSold,
+    decimal GrossProfit,
+    decimal OperatingExpenses,
+    decimal Payroll,
+    decimal Losses,
+    decimal NetResult,
+    decimal PurchasesTotal,
+    decimal CapitalExpenses);
+
+/// <summary>
+/// Lucro de um lote (uma compra de um produto). Receita = parte da receita líquida das vendas que saiu deste lote;
+/// custo = quantidade vendida × custo do lote; perdas = prejuízo do que se perdeu dele.
+/// </summary>
+public record LotProfitDto(
+    Guid LotId,
+    string LotNumber,
+    Guid ProductId,
+    string ProductName,
+    string Supplier,
+    string Unit,
+    DateOnly EntryDate,
+    DateOnly ExpiryDate,
+    decimal UnitCost,
+    decimal QtyBought,
+    decimal QtySold,
+    decimal QtyLost,
+    decimal QtyRemaining,
+    decimal Revenue,
+    decimal Cost,
+    decimal LossCost,
+    decimal Profit,
+    decimal MarginPercent,
+    decimal StockValue);
+
 public interface IFinancialSummaryService
 {
     Task<FinancialSummaryDto> GetAsync(DateOnly from, DateOnly to, CancellationToken ct);
+    Task<List<MonthlyBalanceDto>> GetMonthlyAsync(int year, CancellationToken ct);
+    Task<List<LotProfitDto>> GetLotProfitsAsync(DateOnly from, DateOnly to, CancellationToken ct);
 }

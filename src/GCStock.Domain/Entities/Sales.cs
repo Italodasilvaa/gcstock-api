@@ -82,7 +82,7 @@ public class SaleItem
     public List<SaleItemLot> Lots { get; set; } = [];
 }
 
-/// <summary>Quantidade que um item de venda consumiu de um lote (FEFO). Sem FK para o lote: ele pode ser refeito por edição de compra.</summary>
+/// <summary>Quantidade que um item de venda consumiu de um lote (pedido mais antigo primeiro, ou o lote escolhido). Sem FK para o lote: ele pode ser refeito por edição de compra.</summary>
 public class SaleItemLot
 {
     public Guid Id { get; set; } = Guid.CreateVersion7();

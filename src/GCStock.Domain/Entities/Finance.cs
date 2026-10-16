@@ -27,6 +27,25 @@ public class AccountsPayable
     public Guid? PurchaseEntryId { get; set; }
 }
 
+/// <summary>
+/// Aporte de capital: dinheiro que o dono/sócio colocou na empresa. Entra no Caixa como valor positivo e não é
+/// receita nem lucro (não aparece no resultado do período).
+/// </summary>
+public class CapitalContribution
+{
+    public Guid Id { get; set; } = Guid.CreateVersion7();
+    public Guid CompanyId { get; set; }
+    public Company? Company { get; set; }
+
+    public DateOnly Date { get; set; }
+    public string Description { get; set; } = string.Empty;
+    /// <summary>Quem colocou o dinheiro (sócio, banco, empréstimo...).</summary>
+    public string Source { get; set; } = string.Empty;
+    public decimal Amount { get; set; }
+    public string CreatedBy { get; set; } = string.Empty;
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+}
+
 /// <summary>Status: "vencido" | "a_vencer" | "recebido". Type: "b2b" | "adquirente" | "evento".</summary>
 public class AccountsReceivable
 {

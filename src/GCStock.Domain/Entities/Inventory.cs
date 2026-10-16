@@ -13,6 +13,8 @@ public class StockBatch
     public string LotNumber { get; set; } = string.Empty;
     /// <summary>Quantidade disponível do lote, na unidade do produto (o nome "Kg" é histórico: pode ser kg, pct, un...).</summary>
     public decimal AvailableKg { get; set; }
+    /// <summary>Custo unitário deste lote (o que foi pago na compra): usado para calcular o lucro real de quem escolhe o lote na venda.</summary>
+    public decimal UnitCost { get; set; }
     /// <summary>Unidade do produto (cadastro): "kg" | "un" | "pct" | "cx".</summary>
     public string Unit { get; set; } = "kg";
     public DateOnly EntryDate { get; set; }

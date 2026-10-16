@@ -13,7 +13,10 @@ public record StockBatchDto(
     string FiscalDoc,
     string Supplier,
     string Status,
-    string Unit);
+    string Unit,
+    decimal UnitCost = 0,
+    /// <summary>Número do pedido de compra que originou o lote (vazio no estoque sem lote).</summary>
+    string OrderCode = "");
 
 public record StockMovementDto(
     Guid Id,

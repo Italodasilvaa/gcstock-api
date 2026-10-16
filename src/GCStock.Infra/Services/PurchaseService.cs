@@ -339,6 +339,7 @@ public class PurchaseService(GCStockDbContext db, ICurrentUserContext currentUse
                 Sku = item.Code,
                 LotNumber = item.LotNumber,
                 AvailableKg = item.Quantity,
+                UnitCost = item.UnitCost,
                 Unit = product.Unit,
                 EntryDate = entry.EntryDate,
                 ExpiryDate = expiryDate,

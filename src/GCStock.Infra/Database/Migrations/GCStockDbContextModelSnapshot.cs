@@ -295,6 +295,43 @@ namespace GCStock.Infra.Database.Migrations
                     b.ToTable("Branches");
                 });
 
+            modelBuilder.Entity("GCStock.Domain.Entities.CapitalContribution", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("Amount")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<Guid>("CompanyId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("CreatedBy")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<DateOnly>("Date")
+                        .HasColumnType("date");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("Source")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CompanyId", "Date");
+
+                    b.ToTable("CapitalContributions");
+                });
+
             modelBuilder.Entity("GCStock.Domain.Entities.CardSettlement", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1112,6 +1149,9 @@ namespace GCStock.Infra.Database.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
+                    b.Property<decimal>("UnitCost")
+                        .HasColumnType("decimal(18,2)");
+
                     b.HasKey("Id");
 
                     b.HasIndex("CompanyId");
@@ -1312,6 +1352,17 @@ namespace GCStock.Infra.Database.Migrations
                 });
 
             modelBuilder.Entity("GCStock.Domain.Entities.Branch", b =>
+                {
+                    b.HasOne("GCStock.Domain.Entities.Company", "Company")
+                        .WithMany()
+                        .HasForeignKey("CompanyId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Company");
+                });
+
+            modelBuilder.Entity("GCStock.Domain.Entities.CapitalContribution", b =>
                 {
                     b.HasOne("GCStock.Domain.Entities.Company", "Company")
                         .WithMany()

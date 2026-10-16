@@ -74,13 +74,54 @@ public class PosService(GCStockDbContext db, ICurrentUserContext currentUser, IA
         static string Format(decimal value) => value.ToString("0.###", PtBr);
     }
 
-    /// <summary>Consome os lotes do produto (vence primeiro, sai primeiro) e guarda de onde saiu, para devolver no cancelamento.</summary>
+    /// <summary>Consome os lotes do produto (pedido mais antigo primeiro) e guarda de onde saiu, para devolver no cancelamento.</summary>
     private async Task ConsumeLotsAsync(SaleItem saleItem, Guid productId, decimal quantity, CancellationToken ct)
     {
         foreach (var (lotId, qty) in await StockLots.ConsumeAsync(db, currentUser.CompanyId, productId, quantity, ct))
         {
             saleItem.Lots.Add(new SaleItemLot { StockBatchId = lotId, ProductId = productId, Qty = qty });
         }
+    }
+
+    /// <summary>
+    /// Lotes escolhidos na venda: precisam existir, ser do produto da linha e ter saldo para tudo o que a venda tira deles.
+    /// </summary>
+    private async Task<Dictionary<Guid, StockBatch>> LoadChosenLotsAsync(
+        FinalizeSaleRequest request, Dictionary<Guid, Product> products, CancellationToken ct)
+    {
+        var chosen = request.Items.Where(i => i.StockBatchId.HasValue).ToList();
+        if (chosen.Count == 0) return [];
+
+        if (chosen.Any(i => !i.ProductId.HasValue || !products.ContainsKey(i.ProductId.Value)))
+        {
+            throw new ArgumentException("Só é possível escolher o lote de um produto avulso (kits saem do pedido mais antigo).");
+        }
+
+        var ids = chosen.Select(i => i.StockBatchId!.Value).Distinct().ToList();
+        var lots = await db.StockBatches
+            .Where(b => b.CompanyId == currentUser.CompanyId && ids.Contains(b.Id))
+            .ToDictionaryAsync(b => b.Id, ct);
+
+        foreach (var item in chosen)
+        {
+            if (!lots.TryGetValue(item.StockBatchId!.Value, out var lot) || lot.ProductId != item.ProductId)
+            {
+                throw new ArgumentException($"O lote escolhido para {item.Name} não existe ou não é desse produto.");
+            }
+        }
+
+        foreach (var group in chosen.GroupBy(i => i.StockBatchId!.Value))
+        {
+            var lot = lots[group.Key];
+            var wanted = group.Sum(i => i.Qty);
+            if (wanted > lot.AvailableKg)
+            {
+                throw new InvalidOperationException(
+                    $"Estoque insuficiente no lote {lot.LotNumber} de {lot.ProductName} (disponível {lot.AvailableKg.ToString("0.###", PtBr)} {lot.Unit}, pedido {wanted.ToString("0.###", PtBr)} {lot.Unit}).");
+            }
+        }
+
+        return lots;
     }
 
     public async Task<FinalizeSaleResult> FinalizeSaleAsync(FinalizeSaleRequest request, CancellationToken ct)
@@ -123,6 +164,7 @@ public class PosService(GCStockDbContext db, ICurrentUserContext currentUser, IA
 
         await EnsurePricesAllowedAsync(request, products, kits, ct);
         EnsureStockAvailable(request, products, kits);
+        var chosenLots = await LoadChosenLotsAsync(request, products, ct);
 
         var saleItems = new List<SaleItem>();
 
@@ -133,8 +175,12 @@ public class PosService(GCStockDbContext db, ICurrentUserContext currentUser, IA
                 ? lineProduct.Unit
                 : line.KitId.HasValue ? "un" : line.Unit;
 
-            // Custo médio do estoque NO MOMENTO da venda (a venda não altera o custo médio); kit = soma dos componentes.
-            var unitCost = line.ProductId.HasValue && products.TryGetValue(line.ProductId.Value, out var costProduct)
+            // Lote escolhido: custo do lote (lucro real). Senão, custo médio do estoque NO MOMENTO da venda (a venda não
+            // altera o custo médio); kit = soma dos componentes.
+            var chosenLot = line.StockBatchId.HasValue ? chosenLots[line.StockBatchId.Value] : null;
+            var unitCost = chosenLot is { UnitCost: > 0 }
+                ? chosenLot.UnitCost
+                : line.ProductId.HasValue && products.TryGetValue(line.ProductId.Value, out var costProduct)
                 ? costProduct.CostPrice
                 : line.KitId.HasValue && kits.TryGetValue(line.KitId.Value, out var costKit)
                     ? costKit.Components.Sum(c => products.TryGetValue(c.ProductId, out var cp) ? c.Quantity * cp.CostPrice : 0m)
@@ -163,13 +209,14 @@ public class PosService(GCStockDbContext db, ICurrentUserContext currentUser, IA
                 DocInfo = $"Tíquete Balcão 01 • {request.PaymentMode} • {request.Total.ToString("C", PtBr)}",
                 AmountKg = -line.Qty,
                 Unit = lineUnit,
-                Description = $"Baixa realizada no PDV: {line.Qty}x {line.Name}",
+                Description = $"Baixa realizada no PDV: {line.Qty}x {line.Name}" + (chosenLot is null ? "" : $" • Lote {chosenLot.LotNumber}"),
                 BadgeLabel = "PDV Finalizado",
                 AuditLink = "Cupom SAT",
             });
         }
 
-        for (var index = 0; index < request.Items.Count; index++)
+        // Quem escolheu lote é atendido primeiro, para a ordem automática das outras linhas não esvaziar o lote escolhido.
+        foreach (var index in Enumerable.Range(0, request.Items.Count).OrderBy(i => request.Items[i].StockBatchId.HasValue ? 0 : 1))
         {
             var item = request.Items[index];
             var saleItem = saleItems[index];
@@ -177,7 +224,15 @@ public class PosService(GCStockDbContext db, ICurrentUserContext currentUser, IA
             if (item.ProductId.HasValue && products.TryGetValue(item.ProductId.Value, out var product))
             {
                 product.Stock -= item.Qty;
-                await ConsumeLotsAsync(saleItem, product.Id, item.Qty, ct);
+                if (item.StockBatchId.HasValue)
+                {
+                    chosenLots[item.StockBatchId.Value].AvailableKg -= item.Qty;
+                    saleItem.Lots.Add(new SaleItemLot { StockBatchId = item.StockBatchId.Value, ProductId = product.Id, Qty = item.Qty });
+                }
+                else
+                {
+                    await ConsumeLotsAsync(saleItem, product.Id, item.Qty, ct);
+                }
                 continue;
             }
 
@@ -196,7 +251,7 @@ public class PosService(GCStockDbContext db, ICurrentUserContext currentUser, IA
             }
         }
 
-        // As vendas baixam o estoque do produto; os lotes acompanham (consome primeiro o que vence antes).
+        // As vendas baixam o estoque do produto; os lotes acompanham (consome primeiro o pedido mais antigo).
         await StockLots.ReconcileAsync(db, currentUser.CompanyId, [.. products.Values], ct);
 
         // Pagamento a crédito/parcelado gera um recebível de adquirente para D+30.

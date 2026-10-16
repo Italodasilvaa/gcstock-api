@@ -290,6 +290,24 @@ troca e transferência entre empresas (só o dono, validado no serviço) e uploa
   `losses`, `lossCount`, `lossesByReason`; `netResult` já desconta as perdas ativas).
 - Migration `AddStockLosses` (tabelas `StockLosses` e `StockLossLots`).
 
+## Caixa da empresa (saúde financeira)
+
+- **Regime de caixa** (`GET /api/v1/financeiro/caixa?de&ate`): só conta dinheiro que realmente entrou ou saiu.
+  Entra (+): **aportes** (`CapitalContributions`), vendas recebidas na hora (dinheiro, Pix, débito) e títulos a receber **liquidados** (cartão, fiado).
+  Sai (−): contas a pagar **pagas** (compras de mercadoria, equipamento e despesas), na data da baixa. Venda cancelada não conta.
+  Devolve saldo inicial/final do período, entradas e saídas por tipo, o extrato e a foto de hoje: caixa, a receber, a pagar (e vencido), estoque a custo e a folha mensal (informativa, não sai do caixa).
+- **Aporte de capital** = dinheiro que o dono colocou na empresa (`GET/POST/DELETE /api/v1/financeiro/aportes`, permissão `aportes.gerenciar`). Não é receita nem entra no resultado (DRE).
+  O que estava lançado como "investimento" em Contas a Pagar virou aporte (migration `AddCapitalContributions`), e a API recusa novo título com categoria `investimento`.
+- Equipamento e reformas são despesas: saem do caixa quando pagas.
+
+## Lucro real: lote na venda, lucro por lote e balanço mensal
+
+- **Custo por lote:** cada lote guarda o custo unitário da compra (`StockBatch.UnitCost`, migration `AddStockBatchUnitCost`).
+- **Escolher o lote na venda:** `PosSaleItem.StockBatchId` (produto avulso). A venda sai desse lote (409 se faltar saldo) e o custo do item é o do lote;
+  sem lote, sai o que vence antes e o custo é o médio. Cancelar a venda devolve ao mesmo lote.
+- `GET /api/v1/financeiro/lucro-por-lote?de&ate`: por lote, receita líquida do que saiu dele, custo (qtd × custo do lote), perdas, lucro, margem e saldo. Kits ficam de fora.
+- `GET /api/v1/financeiro/balanco-mensal?ano`: os 12 meses com receita líquida, CMV, lucro bruto, despesas, folha, perdas e resultado (mesmo cálculo do resultado do período).
+
 ## Custo médio e resultado financeiro
 
 - **Custo médio móvel do estoque** (`Product.CostPrice`): cada compra se mistura ao estoque que já existe na hora,

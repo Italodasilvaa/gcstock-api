@@ -7,13 +7,13 @@ namespace GCStock.Infra.Services;
 /// <summary>
 /// Mantém os lotes coerentes com o estoque do produto. O estoque do produto (Product.Stock) é a fonte da verdade:
 /// vendas, edição de compras e ajustes manuais mexem nele, e os lotes (StockBatch) nunca podem somar MAIS que ele.
-/// O excesso é consumido primeiro dos lotes que vencem antes (FEFO). Lotes nunca são aumentados aqui: estoque sem
+/// O excesso é consumido primeiro dos lotes do pedido mais antigo. Lotes nunca são aumentados aqui: estoque sem
 /// lote (cadastro manual, por exemplo) simplesmente não tem lote.
 /// </summary>
 internal static class StockLots
 {
     /// <summary>
-    /// Tira `quantity` do produto consumindo primeiro os lotes que vencem antes (FEFO) e devolve de quais lotes saiu,
+    /// Tira `quantity` do produto consumindo primeiro os lotes que vencem antes (pedido mais antigo primeiro) e devolve de quais lotes saiu,
     /// para o cancelamento da venda poder devolver ao mesmo lote. O que não estiver coberto por lotes não é registrado.
     /// </summary>
     public static async Task<List<(Guid LotId, decimal Qty)>> ConsumeAsync(
@@ -29,8 +29,8 @@ internal static class StockLots
             .Where(b => b.CompanyId == companyId && b.ProductId == productId)
             .Union(fromDb)
             .Where(b => b.AvailableKg > 0)
-            .OrderBy(b => b.ExpiryDate)
-            .ThenBy(b => b.EntryDate)
+            .OrderBy(b => b.EntryDate)
+            .ThenBy(b => b.ExpiryDate)
             .ToList();
 
         var remaining = quantity;
@@ -68,8 +68,8 @@ internal static class StockLots
         {
             var productLots = lots
                 .Where(b => b.ProductId == product.Id)
-                .OrderBy(b => b.ExpiryDate)
-                .ThenBy(b => b.EntryDate)
+                .OrderBy(b => b.EntryDate)
+                .ThenBy(b => b.ExpiryDate)
                 .ToList();
 
             var excess = productLots.Sum(b => b.AvailableKg) - Math.Max(0, product.Stock);

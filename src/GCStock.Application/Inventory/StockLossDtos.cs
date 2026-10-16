@@ -36,7 +36,7 @@ public record StockLossDto(
     string? UndoneBy);
 
 /// <param name="UnitCost">Custo unitário da perda (o do lote perdido); vazio = custo médio atual do produto.</param>
-/// <param name="StockBatchId">Lote que foi perdido (opcional); vazio = sai primeiro o que vence antes.</param>
+/// <param name="StockBatchId">Lote que foi perdido (opcional); vazio = sai primeiro o pedido mais antigo.</param>
 /// <param name="Date">Dia da perda (padrão: hoje, no horário de Brasília).</param>
 public record CreateStockLossRequest(
     Guid ProductId,

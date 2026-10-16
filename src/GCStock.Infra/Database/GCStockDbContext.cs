@@ -26,6 +26,7 @@ public class GCStockDbContext(DbContextOptions<GCStockDbContext> options) : DbCo
     public DbSet<PurchaseItem> PurchaseItems => Set<PurchaseItem>();
 
     public DbSet<AccountsPayable> AccountsPayables => Set<AccountsPayable>();
+    public DbSet<CapitalContribution> CapitalContributions => Set<CapitalContribution>();
     public DbSet<AccountsReceivable> AccountsReceivables => Set<AccountsReceivable>();
     public DbSet<PaymentFeeSetting> PaymentFeeSettings => Set<PaymentFeeSetting>();
     public DbSet<CardSettlement> CardSettlements => Set<CardSettlement>();
@@ -132,6 +133,7 @@ public class GCStockDbContext(DbContextOptions<GCStockDbContext> options) : DbCo
             e.HasOne(x => x.Company).WithMany().HasForeignKey(x => x.CompanyId).OnDelete(DeleteBehavior.Cascade);
             e.HasIndex(x => x.CompanyId);
             e.Property(x => x.AvailableKg).HasColumnType(qtyType);
+            e.Property(x => x.UnitCost).HasColumnType(moneyType);
         });
 
         modelBuilder.Entity<StockMovement>(e =>
@@ -140,6 +142,14 @@ public class GCStockDbContext(DbContextOptions<GCStockDbContext> options) : DbCo
             e.HasOne(x => x.Company).WithMany().HasForeignKey(x => x.CompanyId).OnDelete(DeleteBehavior.Cascade);
             e.HasIndex(x => x.CompanyId);
             e.Property(x => x.AmountKg).HasColumnType(qtyType);
+        });
+
+        modelBuilder.Entity<CapitalContribution>(e =>
+        {
+            e.HasKey(x => x.Id);
+            e.HasOne(x => x.Company).WithMany().HasForeignKey(x => x.CompanyId).OnDelete(DeleteBehavior.Cascade);
+            e.HasIndex(x => new { x.CompanyId, x.Date });
+            e.Property(x => x.Amount).HasColumnType(moneyType);
         });
 
         modelBuilder.Entity<StockLoss>(e =>
