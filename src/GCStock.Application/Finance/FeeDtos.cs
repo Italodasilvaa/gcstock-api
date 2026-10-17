@@ -40,6 +40,7 @@ public interface IFeeService
     Task<List<PaymentFeeSettingDto>> GetAllAsync(CancellationToken ct);
     Task<PaymentFeeSettingDto> CreateAsync(CreateFeeRequest request, CancellationToken ct);
     Task<PaymentFeeSettingDto> SaveAsync(SaveFeeRequest request, CancellationToken ct);
+    Task<bool> DeleteAsync(Guid id, CancellationToken ct);
     /// <summary>Define a ordem das taxas; ids ausentes vão para o fim mantendo a ordem relativa.</summary>
     Task<List<PaymentFeeSettingDto>> ReorderAsync(ReorderFeesRequest request, CancellationToken ct);
 }

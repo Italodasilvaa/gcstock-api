@@ -29,6 +29,7 @@ public static class Permissions
     // Compras / Entradas
     public const string PurchasesCreate = "compras.criar";
     public const string PurchasesEdit = "compras.editar";
+    public const string PurchasesDelete = "compras.excluir";
 
     // Vendas (PDV)
     public const string SalesCreate = "vendas.criar";
@@ -40,6 +41,7 @@ public static class Permissions
     // Clientes
     public const string ClientsCreate = "clientes.criar";
     public const string ClientsEdit = "clientes.editar";
+    public const string ClientsDelete = "clientes.excluir";
 
     // Funcionários (a atribuição de permissões é exclusiva do dono)
     public const string EmployeesCreate = "funcionarios.criar";
@@ -56,6 +58,10 @@ public static class Permissions
     // Financeiro
     public const string PayablesCreate = "contas-pagar.criar";
     public const string PayablesSettle = "contas-pagar.baixar";
+    public const string PayablesDelete = "contas-pagar.excluir";
+    public const string PayablesEdit = "contas-pagar.editar";
+    public const string ReceivablesEdit = "contas-receber.editar";
+    public const string ReceivablesDelete = "contas-receber.excluir";
     public const string ReceivablesCreate = "contas-receber.criar";
     public const string ReceivablesSettle = "contas-receber.liquidar";
     public const string CardsAnticipate = "cartoes.antecipar";
@@ -63,6 +69,7 @@ public static class Permissions
     // Configurações
     public const string FeesCreate = "taxas.criar";
     public const string FeesEdit = "taxas.editar";
+    public const string FeesDelete = "taxas.excluir";
     public const string AlertsEdit = "alertas.editar";
 
     public static readonly IReadOnlyList<PermissionInfo> All =
@@ -81,6 +88,7 @@ public static class Permissions
 
         new(PurchasesCreate, "Lançar compras", "Registrar novas entradas de compra.", "Compras"),
         new(PurchasesEdit, "Editar pedidos de compra", "Alterar entradas de compra já lançadas, inclusive as já pagas.", "Compras"),
+        new(PurchasesDelete, "Excluir pedidos de compra", "Apagar uma entrada de compra lançada por engano (estorna estoque e custo; só se nada dela foi vendido).", "Compras"),
 
         new(SalesCreate, "Realizar vendas", "Finalizar vendas no PDV.", "Vendas (PDV)"),
         new(SalesCancel, "Cancelar vendas", "Cancelar (estornar) vendas já finalizadas: devolve o estoque e desfaz o título a receber.", "Vendas (PDV)"),
@@ -88,6 +96,7 @@ public static class Permissions
 
         new(ClientsCreate, "Cadastrar clientes", "Criar novos clientes.", "Clientes"),
         new(ClientsEdit, "Editar clientes", "Alterar dados e limite de crédito dos clientes.", "Clientes"),
+        new(ClientsDelete, "Excluir clientes", "Apagar clientes sem contas a receber em aberto.", "Clientes"),
 
         new(EmployeesCreate, "Cadastrar funcionários", "Criar o acesso de novos funcionários.", "Funcionários"),
         new(EmployeesEdit, "Editar funcionários", "Alterar dados, senha e acesso de funcionários.", "Funcionários"),
@@ -100,14 +109,19 @@ public static class Permissions
 
         new(PayablesCreate, "Lançar contas a pagar", "Criar títulos de contas a pagar.", "Contas a pagar"),
         new(PayablesSettle, "Dar baixa em contas a pagar", "Marcar contas a pagar como pagas.", "Contas a pagar"),
+        new(PayablesEdit, "Editar contas a pagar", "Corrigir descrição, valor, vencimento e categoria de despesas lançadas.", "Contas a pagar"),
+        new(PayablesDelete, "Excluir despesas lançadas", "Apagar uma despesa ou equipamento lançado por engano (sai do caixa e do resultado).", "Contas a pagar"),
 
         new(ReceivablesCreate, "Lançar contas a receber", "Criar títulos de contas a receber.", "Contas a receber"),
+        new(ReceivablesEdit, "Editar contas a receber", "Corrigir título a receber em aberto (vendas só mudam o vencimento).", "Contas a receber"),
+        new(ReceivablesDelete, "Excluir contas a receber", "Apagar título a receber manual em aberto.", "Contas a receber"),
         new(ReceivablesSettle, "Liquidar contas a receber", "Marcar contas a receber como recebidas.", "Contas a receber"),
 
         new(CardsAnticipate, "Antecipar recebíveis de cartão", "Antecipar liquidações de cartão.", "Cartões"),
 
         new(FeesCreate, "Criar taxas de pagamento", "Cadastrar formas de pagamento e suas taxas.", "Configurações"),
         new(FeesEdit, "Editar taxas de pagamento", "Alterar, ativar/desativar e reordenar taxas.", "Configurações"),
+        new(FeesDelete, "Excluir taxas de pagamento", "Remover formas de pagamento cadastradas.", "Configurações"),
         new(AlertsEdit, "Editar alertas sanitários", "Alterar a configuração dos alertas de validade.", "Configurações"),
     ];
 

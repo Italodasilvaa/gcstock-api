@@ -25,6 +25,9 @@ public static class ConfiguracoesEndpoints
             }
         }).RequireAuthorization(Permissions.FeesCreate);
 
+        group.MapDelete("/taxas/{id:guid}", async (Guid id, IFeeService service, CancellationToken ct) =>
+            await service.DeleteAsync(id, ct) ? Results.NoContent() : Results.NotFound()).RequireAuthorization(Permissions.FeesDelete);
+
         group.MapPut("/taxas/ordem", async (ReorderFeesRequest request, IFeeService service, CancellationToken ct) =>
             Results.Ok(await service.ReorderAsync(request, ct))).RequireAuthorization(Permissions.FeesEdit);
 

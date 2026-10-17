@@ -17,6 +17,17 @@ public class FeeService(GCStockDbContext db, ICurrentUserContext currentUser, IA
             .ToListAsync(ct);
     }
 
+    public async Task<bool> DeleteAsync(Guid id, CancellationToken ct)
+    {
+        var fee = await db.PaymentFeeSettings.FirstOrDefaultAsync(f => f.Id == id && f.CompanyId == currentUser.CompanyId, ct);
+        if (fee is null) return false;
+
+        db.PaymentFeeSettings.Remove(fee);
+        await db.SaveChangesAsync(ct);
+        await audit.RecordAsync("excluiu", "Taxa de Pagamento", fee.Method, null, ct);
+        return true;
+    }
+
     public async Task<PaymentFeeSettingDto> CreateAsync(CreateFeeRequest request, CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(request.Method) || string.IsNullOrWhiteSpace(request.Channel))

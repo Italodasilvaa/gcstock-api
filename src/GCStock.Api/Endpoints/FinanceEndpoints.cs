@@ -17,6 +17,45 @@ public static class FinanceEndpoints
                 ? Results.BadRequest(new { message = "Investimento agora é um aporte de capital: lance em Gestão da Empresa > Aportes (entra no caixa como valor positivo)." })
                 : Results.Created("/api/v1/financeiro/contas-a-pagar", await service.AddAsync(request, ct))).RequireAuthorization(Permissions.PayablesCreate);
 
+        group.MapPut("/contas-a-pagar/{id:guid}", async (Guid id, UpdatePayableRequest request, IPayableService service, CancellationToken ct) =>
+        {
+            try
+            {
+                var updated = await service.UpdateAsync(id, request, ct);
+                return updated is not null ? Results.Ok(updated) : Results.NotFound();
+            }
+            catch (ArgumentException ex)
+            {
+                return Results.BadRequest(new { message = ex.Message });
+            }
+        }).RequireAuthorization(Permissions.PayablesEdit);
+
+        group.MapDelete("/contas-a-pagar/{id:guid}", async (Guid id, IPayableService service, CancellationToken ct) =>
+        {
+            try
+            {
+                return await service.DeleteAsync(id, ct) ? Results.NoContent() : Results.NotFound();
+            }
+            catch (InvalidOperationException ex)
+            {
+                return Results.Conflict(new { message = ex.Message });
+            }
+        }).RequireAuthorization(Permissions.PayablesDelete);
+
+        // Reclassifica um lançamento: equipamento (feito com o capital, fora do resultado) ou despesa geral.
+        group.MapPut("/contas-a-pagar/{id:guid}/categoria", async (Guid id, ChangePayableCategoryRequest request, IPayableService service, CancellationToken ct) =>
+        {
+            try
+            {
+                var changed = await service.ChangeCategoryAsync(id, request, ct);
+                return changed is not null ? Results.Ok(changed) : Results.NotFound();
+            }
+            catch (ArgumentException ex)
+            {
+                return Results.BadRequest(new { message = ex.Message });
+            }
+        }).RequireAuthorization(Permissions.PayablesCreate);
+
         group.MapPost("/contas-a-pagar/{id:guid}/baixar", async (Guid id, SettlePayableRequest request, IPayableService service, CancellationToken ct) =>
         {
             var settled = await service.SettleAsync(id, request, ct);
@@ -28,6 +67,35 @@ public static class FinanceEndpoints
 
         group.MapPost("/clientes-a-receber", async (AddReceivableRequest request, IReceivableService service, CancellationToken ct) =>
             Results.Created("/api/v1/financeiro/clientes-a-receber", await service.AddAsync(request, ct))).RequireAuthorization(Permissions.ReceivablesCreate);
+
+        group.MapPut("/clientes-a-receber/{id:guid}", async (Guid id, UpdateReceivableRequest request, IReceivableService service, CancellationToken ct) =>
+        {
+            try
+            {
+                var updated = await service.UpdateAsync(id, request, ct);
+                return updated is not null ? Results.Ok(updated) : Results.NotFound();
+            }
+            catch (ArgumentException ex)
+            {
+                return Results.BadRequest(new { message = ex.Message });
+            }
+            catch (InvalidOperationException ex)
+            {
+                return Results.Conflict(new { message = ex.Message });
+            }
+        }).RequireAuthorization(Permissions.ReceivablesEdit);
+
+        group.MapDelete("/clientes-a-receber/{id:guid}", async (Guid id, IReceivableService service, CancellationToken ct) =>
+        {
+            try
+            {
+                return await service.DeleteAsync(id, ct) ? Results.NoContent() : Results.NotFound();
+            }
+            catch (InvalidOperationException ex)
+            {
+                return Results.Conflict(new { message = ex.Message });
+            }
+        }).RequireAuthorization(Permissions.ReceivablesDelete);
 
         group.MapPost("/clientes-a-receber/{id:guid}/liquidar", async (Guid id, IReceivableService service, CancellationToken ct) =>
         {
@@ -70,6 +138,19 @@ public static class FinanceEndpoints
             try
             {
                 return Results.Created("/api/v1/financeiro/aportes", await service.AddContributionAsync(request, ct));
+            }
+            catch (ArgumentException ex)
+            {
+                return Results.BadRequest(new { message = ex.Message });
+            }
+        }).RequireAuthorization(Permissions.CapitalManage);
+
+        group.MapPut("/aportes/{id:guid}", async (Guid id, AddCapitalContributionRequest request, ICashService service, CancellationToken ct) =>
+        {
+            try
+            {
+                var updated = await service.UpdateContributionAsync(id, request, ct);
+                return updated is not null ? Results.Ok(updated) : Results.NotFound();
             }
             catch (ArgumentException ex)
             {

@@ -24,6 +24,18 @@ public static class PurchaseEndpoints
             }
         }).RequireAuthorization(Permissions.PurchasesCreate);
 
+        group.MapDelete("/{id:guid}", async (Guid id, IPurchaseService service, CancellationToken ct) =>
+        {
+            try
+            {
+                return await service.DeleteAsync(id, ct) ? Results.NoContent() : Results.NotFound();
+            }
+            catch (InvalidOperationException ex)
+            {
+                return Results.Conflict(new { message = ex.Message });
+            }
+        }).RequireAuthorization(Permissions.PurchasesDelete);
+
         group.MapPut("/{id:guid}", async (Guid id, SavePurchaseRequest request, IPurchaseService service, CancellationToken ct) =>
         {
             try

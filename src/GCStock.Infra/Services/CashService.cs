@@ -44,12 +44,23 @@ public class CashService(GCStockDbContext db, ICurrentUserContext currentUser, I
         movements.AddRange(received.Select(r =>
             new CashMovementDto(r.ReceivedDate ?? r.DueDate, "recebimento", $"Recebido: {r.ClientOrOrigin} ({r.Reference})", r.NetAmount)));
 
-        // Saídas: contas a pagar pagas
+        // Saídas: toda nota de entrada (compra) sai do caixa na data da entrada, mesmo a prazo ou ainda não paga.
+        var purchases = await db.PurchaseEntries
+            .Where(p => p.CompanyId == companyId)
+            .Select(p => new { p.EntryDate, p.OrderCode, p.SupplierName, p.TotalAmount, p.PaymentStatus })
+            .ToListAsync(ct);
+        movements.AddRange(purchases.Select(p =>
+            new CashMovementDto(
+                p.EntryDate, "compra",
+                $"Compra {p.OrderCode} ({p.SupplierName})" + (p.PaymentStatus == "pago" ? "" : " — a pagar"),
+                -p.TotalAmount)));
+
+        // Saídas: equipamentos e despesas quando pagos (as compras já saíram acima, na entrada)
         var payables = await db.AccountsPayables.Where(p => p.CompanyId == companyId).ToListAsync(ct);
-        movements.AddRange(payables.Where(p => p.Status == "pago").Select(p =>
+        movements.AddRange(payables.Where(p => p.Status == "pago" && p.Category != "compras").Select(p =>
             new CashMovementDto(
                 p.PaidDate ?? p.IssueDate,
-                p.Category == "compras" ? "compra" : p.Category == "equipamento" ? "equipamento" : "despesa",
+                p.Category == "equipamento" ? "equipamento" : "despesa",
                 string.IsNullOrWhiteSpace(p.Supplier) ? p.Description : $"{p.Description} ({p.Supplier})",
                 -p.Amount)));
 
@@ -85,6 +96,7 @@ public class CashService(GCStockDbContext db, ICurrentUserContext currentUser, I
             toReceive,
             open.Sum(p => p.Amount),
             open.Where(p => p.Status == "vencido" || p.DueDate < today).Sum(p => p.Amount),
+            open.Where(p => p.Category == "compras").Sum(p => p.Amount),
             stockValue,
             payroll,
             [.. movements.Where(InPeriod).OrderByDescending(m => m.Date).ThenBy(m => m.Kind)]);
@@ -117,6 +129,24 @@ public class CashService(GCStockDbContext db, ICurrentUserContext currentUser, I
         await db.SaveChangesAsync(ct);
         await audit.RecordAsync("criou", "Aporte de capital", $"{saved.Description} • {saved.Amount:0.00}", saved.Source, ct);
         return new CapitalContributionDto(saved.Id, saved.Date, saved.Description, saved.Source, saved.Amount, saved.CreatedBy);
+    }
+
+    public async Task<CapitalContributionDto?> UpdateContributionAsync(Guid id, AddCapitalContributionRequest request, CancellationToken ct)
+    {
+        var item = await db.CapitalContributions.FirstOrDefaultAsync(c => c.Id == id && c.CompanyId == currentUser.CompanyId, ct);
+        if (item is null) return null;
+        if (string.IsNullOrWhiteSpace(request.Description)) throw new ArgumentException("Informe uma descrição para o aporte.");
+        if (request.Amount <= 0) throw new ArgumentException("O valor do aporte deve ser maior que zero.");
+        var date = request.Date ?? item.Date;
+        if (date > Today()) throw new ArgumentException("A data do aporte não pode ser no futuro.");
+
+        item.Description = request.Description.Trim();
+        item.Source = request.Source?.Trim() ?? string.Empty;
+        item.Amount = Math.Round(request.Amount, 2, MidpointRounding.AwayFromZero);
+        item.Date = date;
+        await db.SaveChangesAsync(ct);
+        await audit.RecordAsync("editou", "Aporte de capital", $"{item.Description} • {item.Amount:0.00}", item.Source, ct);
+        return new CapitalContributionDto(item.Id, item.Date, item.Description, item.Source, item.Amount, item.CreatedBy);
     }
 
     public async Task<bool> DeleteContributionAsync(Guid id, CancellationToken ct)

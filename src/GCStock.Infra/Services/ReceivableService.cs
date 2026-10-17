@@ -23,7 +23,7 @@ public class ReceivableService(GCStockDbContext db, ICurrentUserContext currentU
     {
         var gross = request.GrossAmount ?? 0;
         var fee = request.FeeRetention ?? 0;
-        var dueDate = request.DueDate ?? DateOnly.FromDateTime(DateTime.UtcNow.AddDays(20));
+        var dueDate = request.DueDate ?? DateOnly.FromDateTime(DateTime.UtcNow.AddHours(-3).AddDays(20));
 
         var saved = new AccountsReceivable
         {
@@ -46,6 +46,51 @@ public class ReceivableService(GCStockDbContext db, ICurrentUserContext currentU
         return ToDto(saved);
     }
 
+    private static bool IsFromSale(AccountsReceivable r) => r.Reference.StartsWith("NFCe-", StringComparison.OrdinalIgnoreCase);
+
+    public async Task<AccountsReceivableDto?> UpdateAsync(Guid id, UpdateReceivableRequest request, CancellationToken ct)
+    {
+        var item = await db.AccountsReceivables.FirstOrDefaultAsync(r => r.Id == id && r.CompanyId == currentUser.CompanyId, ct);
+        if (item is null) return null;
+        if (item.Status == "recebido") throw new InvalidOperationException("Título já recebido não pode ser editado.");
+        if (request.GrossAmount is <= 0) throw new ArgumentException("O valor deve ser maior que zero.");
+
+        if (request.DueDate is not null)
+        {
+            item.DueDate = request.DueDate.Value;
+            item.DueLabel = DateLabelHelper.DueLabelFor(item.DueDate);
+            item.Status = item.DueDate < DateOnly.FromDateTime(DateTime.UtcNow.AddHours(-3)) ? "vencido" : "a_vencer";
+        }
+
+        if (!IsFromSale(item))
+        {
+            if (request.ClientOrOrigin is not null) item.ClientOrOrigin = request.ClientOrOrigin.Trim();
+            if (request.SubCategory is not null) item.SubCategory = request.SubCategory.Trim();
+            if (request.GrossAmount is not null)
+            {
+                item.GrossAmount = Math.Round(request.GrossAmount.Value, 2, MidpointRounding.AwayFromZero);
+                item.NetAmount = item.GrossAmount - item.FeeRetention;
+            }
+        }
+
+        await db.SaveChangesAsync(ct);
+        await audit.RecordAsync("editou", "Conta a Receber", item.ClientOrOrigin, null, ct);
+        return ToDto(item);
+    }
+
+    public async Task<bool> DeleteAsync(Guid id, CancellationToken ct)
+    {
+        var item = await db.AccountsReceivables.FirstOrDefaultAsync(r => r.Id == id && r.CompanyId == currentUser.CompanyId, ct);
+        if (item is null) return false;
+        if (item.Status == "recebido") throw new InvalidOperationException("Título já recebido não pode ser excluído.");
+        if (IsFromSale(item)) throw new InvalidOperationException("Este título veio de uma venda: cancele a venda em Histórico de Vendas.");
+
+        db.AccountsReceivables.Remove(item);
+        await db.SaveChangesAsync(ct);
+        await audit.RecordAsync("excluiu", "Conta a Receber", item.ClientOrOrigin, null, ct);
+        return true;
+    }
+
     public async Task<AccountsReceivableDto?> SettleAsync(Guid id, CancellationToken ct)
     {
         var item = await db.AccountsReceivables.FirstOrDefaultAsync(r => r.Id == id && r.CompanyId == currentUser.CompanyId, ct);
@@ -53,7 +98,7 @@ public class ReceivableService(GCStockDbContext db, ICurrentUserContext currentU
 
         item.Status = "recebido";
         item.DueLabel = "Recebido / Conciliado";
-        item.ReceivedDate = DateOnly.FromDateTime(DateTime.UtcNow);
+        item.ReceivedDate = DateOnly.FromDateTime(DateTime.UtcNow.AddHours(-3));
 
         await db.SaveChangesAsync(ct);
         await audit.RecordAsync("recebeu", "Conta a Receber", item.ClientOrOrigin, null, ct);

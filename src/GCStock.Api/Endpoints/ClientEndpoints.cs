@@ -17,5 +17,17 @@ public static class ClientEndpoints
 
         group.MapPut("/{id:guid}", async (Guid id, SaveClientRequest request, IClientService service, CancellationToken ct) =>
             Results.Ok(await service.SaveAsync(request with { Id = id }, ct))).RequireAuthorization(Permissions.ClientsEdit);
+
+        group.MapDelete("/{id:guid}", async (Guid id, IClientService service, CancellationToken ct) =>
+        {
+            try
+            {
+                return await service.DeleteAsync(id, ct) ? Results.NoContent() : Results.NotFound();
+            }
+            catch (InvalidOperationException ex)
+            {
+                return Results.Conflict(new { message = ex.Message });
+            }
+        }).RequireAuthorization(Permissions.ClientsDelete);
     }
 }

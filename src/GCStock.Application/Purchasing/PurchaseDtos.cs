@@ -62,4 +62,10 @@ public interface IPurchaseService
     /// recalcula a validade mais próxima dos produtos afetados (antigos e novos). Retorna null se não encontrada.
     /// </summary>
     Task<PurchaseEntryDto?> UpdateAsync(Guid id, SavePurchaseRequest request, CancellationToken ct);
+
+    /// <summary>
+    /// Apaga uma entrada lançada por engano: estorna estoque, lotes, movimentações, custo médio e a conta a pagar.
+    /// Recusa (InvalidOperationException) se parte dos lotes já foi vendida ou perdida.
+    /// </summary>
+    Task<bool> DeleteAsync(Guid id, CancellationToken ct);
 }

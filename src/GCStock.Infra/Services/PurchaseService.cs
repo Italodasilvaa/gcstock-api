@@ -188,6 +188,79 @@ public class PurchaseService(GCStockDbContext db, ICurrentUserContext currentUse
         return ToDto(existing);
     }
 
+    public async Task<bool> DeleteAsync(Guid id, CancellationToken ct)
+    {
+        await using var transaction = await db.Database.BeginTransactionAsync(ct);
+        await db.Database.ExecuteSqlInterpolatedAsync(
+            $"SELECT 1 FROM \"PurchaseEntries\" WHERE \"Id\" = {id} AND \"CompanyId\" = {currentUser.CompanyId} FOR UPDATE", ct);
+
+        var existing = await db.PurchaseEntries
+            .Include(p => p.Items)
+            .FirstOrDefaultAsync(p => p.Id == id && p.CompanyId == currentUser.CompanyId, ct);
+        if (existing is null) return false;
+
+        var batches = await db.StockBatches.Where(b => b.PurchaseEntryId == existing.Id).ToListAsync(ct);
+        var received = existing.Items.Where(i => i.ProductId.HasValue).Sum(i => i.Quantity);
+        if (batches.Sum(b => b.AvailableKg) + 0.0005m < received)
+        {
+            throw new InvalidOperationException(
+                $"Parte do pedido {existing.OrderCode} já foi vendida ou perdida. Cancele as vendas/perdas dele antes de excluir, ou edite a compra.");
+        }
+
+        var productIds = existing.Items.Where(i => i.ProductId.HasValue).Select(i => i.ProductId!.Value).Distinct().ToList();
+        var products = productIds.Count > 0
+            ? await db.Products.Where(p => p.CompanyId == currentUser.CompanyId && productIds.Contains(p.Id)).ToDictionaryAsync(p => p.Id, ct)
+            : [];
+
+        foreach (var item in existing.Items)
+        {
+            if (item.ProductId.HasValue && products.TryGetValue(item.ProductId.Value, out var product))
+            {
+                RemoveFromAverageCost(product, item.Quantity, item.UnitCost);
+                product.Stock = Math.Max(0, product.Stock - item.Quantity);
+            }
+        }
+
+        db.StockBatches.RemoveRange(batches);
+        db.StockMovements.RemoveRange(await db.StockMovements.Where(m => m.PurchaseEntryId == existing.Id).ToListAsync(ct));
+        db.AccountsPayables.RemoveRange(await db.AccountsPayables.Where(p => p.PurchaseEntryId == existing.Id && p.CompanyId == currentUser.CompanyId).ToListAsync(ct));
+        db.PurchaseItems.RemoveRange(existing.Items);
+        db.PurchaseEntries.Remove(existing);
+        await db.SaveChangesAsync(ct);
+
+        // Validade mais próxima dos produtos afetados, agora sem os lotes deste pedido.
+        var now = DateOnly.FromDateTime(DateTime.UtcNow.AddHours(-3));
+        foreach (var product in products.Values)
+        {
+            var nearest = await db.StockBatches
+                .Where(b => b.ProductId == product.Id && b.CompanyId == currentUser.CompanyId && b.AvailableKg > 0)
+                .OrderBy(b => b.ExpiryDate)
+                .Select(b => (DateOnly?)b.ExpiryDate)
+                .FirstOrDefaultAsync(ct);
+            var expiry = nearest ?? now.AddYears(1);
+            var days = expiry.DayNumber - now.DayNumber;
+            product.NearestExpiry = expiry;
+            product.ExpiryDaysRemaining = days;
+            product.ExpiryStatus = days < 0 ? "vencido" : days <= product.AlertDays ? "critico" : days <= 30 ? "normal" : "longo";
+
+            // Se os lotes que sobraram cobrem todo o estoque e têm custo, o custo médio passa a ser o deles (o que sobra de verdade).
+            var remaining = await db.StockBatches
+                .Where(b => b.ProductId == product.Id && b.CompanyId == currentUser.CompanyId && b.AvailableKg > 0 && b.UnitCost > 0)
+                .Select(b => new { b.AvailableKg, b.UnitCost })
+                .ToListAsync(ct);
+            var remainingQty = remaining.Sum(b => b.AvailableKg);
+            if (remainingQty > 0 && Math.Abs(remainingQty - product.Stock) < 0.001m)
+            {
+                product.CostPrice = Math.Round(remaining.Sum(b => b.AvailableKg * b.UnitCost) / remainingQty, 2, MidpointRounding.AwayFromZero);
+            }
+        }
+
+        await db.SaveChangesAsync(ct);
+        await audit.RecordAsync("excluiu", "Compra / Entrada", $"{existing.OrderCode} • {existing.SupplierName}", null, ct);
+        await transaction.CommitAsync(ct);
+        return true;
+    }
+
     private static bool IsPaidOnEntry(string paymentMode) => paymentMode is "pix" or "dinheiro" or "cartao";
 
     /// <summary>Pix/Dinheiro/Cartão: pago no dia da entrada da mercadoria.</summary>
@@ -217,7 +290,7 @@ public class PurchaseService(GCStockDbContext db, ICurrentUserContext currentUse
         var dueDate = purchase.EntryDate.AddDays(PaymentTermDays(purchase.PaymentCondition));
         payable.DueDate = dueDate;
         payable.DueLabel = DateLabelHelper.DueLabelFor(dueDate);
-        payable.Status = dueDate < DateOnly.FromDateTime(DateTime.UtcNow) ? "vencido" : "a_vencer";
+        payable.Status = dueDate < DateOnly.FromDateTime(DateTime.UtcNow.AddHours(-3)) ? "vencido" : "a_vencer";
     }
 
     /// <summary>Prazo em dias a partir da condição digitada: "à vista" = 0; "Boleto 28 dias" = 28; "30/60/90" = 30 (1ª parcela); sem número = 30.</summary>

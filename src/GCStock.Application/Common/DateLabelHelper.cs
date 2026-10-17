@@ -5,7 +5,7 @@ public static class DateLabelHelper
 {
     public static string DueLabelFor(DateOnly dueDate)
     {
-        var diffDays = dueDate.DayNumber - DateOnly.FromDateTime(DateTime.UtcNow).DayNumber;
+        var diffDays = dueDate.DayNumber - DateOnly.FromDateTime(DateTime.UtcNow.AddHours(-3)).DayNumber;
 
         if (diffDays < 0)
         {

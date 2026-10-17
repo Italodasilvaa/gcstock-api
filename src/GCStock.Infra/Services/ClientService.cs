@@ -17,6 +17,24 @@ public class ClientService(GCStockDbContext db, ICurrentUserContext currentUser,
             .ToListAsync(ct);
     }
 
+    public async Task<bool> DeleteAsync(Guid id, CancellationToken ct)
+    {
+        var client = await db.Clients.FirstOrDefaultAsync(c => c.Id == id && c.CompanyId == currentUser.CompanyId, ct);
+        if (client is null) return false;
+
+        var open = await db.AccountsReceivables.AnyAsync(
+            r => r.CompanyId == currentUser.CompanyId && r.ClientId == id && r.Status != "recebido", ct);
+        if (open)
+        {
+            throw new InvalidOperationException("Este cliente tem conta a receber em aberto. Dê baixa ou exclua o título antes de apagar o cliente.");
+        }
+
+        db.Clients.Remove(client);
+        await db.SaveChangesAsync(ct);
+        await audit.RecordAsync("excluiu", "Cliente", client.Name, null, ct);
+        return true;
+    }
+
     public async Task<ClientDto> SaveAsync(SaveClientRequest request, CancellationToken ct)
     {
         if (request.Id.HasValue)
