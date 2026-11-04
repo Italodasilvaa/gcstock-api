@@ -62,7 +62,16 @@ public class ReceivableService(GCStockDbContext db, ICurrentUserContext currentU
             item.Status = item.DueDate < DateOnly.FromDateTime(DateTime.UtcNow.AddHours(-3)) ? "vencido" : "a_vencer";
         }
 
-        if (!IsFromSale(item))
+        // Título de venda: o valor e o cliente vêm da venda e não mudam (só o vencimento). Para corrigir, cancele a venda.
+        if (IsFromSale(item))
+        {
+            var newGross = request.GrossAmount is null ? item.GrossAmount : Math.Round(request.GrossAmount.Value, 2, MidpointRounding.AwayFromZero);
+            if (newGross != item.GrossAmount)
+            {
+                throw new ArgumentException("O valor de um título gerado por venda não pode ser alterado. Cancele a venda em Histórico de Vendas e lance de novo.");
+            }
+        }
+        else
         {
             if (request.ClientOrOrigin is not null) item.ClientOrOrigin = request.ClientOrOrigin.Trim();
             if (request.SubCategory is not null) item.SubCategory = request.SubCategory.Trim();

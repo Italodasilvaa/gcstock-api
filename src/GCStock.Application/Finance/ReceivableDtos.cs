@@ -27,7 +27,7 @@ public record AddReceivableRequest(
     string? Type,
     string? PaymentModeDesc);
 
-/// <summary>Corrige um título em aberto. Título de venda (referência NFCe-) só muda o vencimento.</summary>
+/// <summary>Corrige um título em aberto. Título de venda (referência NFCe-): valor e cliente não mudam, só o vencimento.</summary>
 public record UpdateReceivableRequest(string? ClientOrOrigin, string? SubCategory, decimal? GrossAmount, DateOnly? DueDate);
 
 public interface IReceivableService
