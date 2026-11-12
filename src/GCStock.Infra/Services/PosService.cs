@@ -15,6 +15,30 @@ public class PosService(GCStockDbContext db, ICurrentUserContext currentUser, IA
     private static readonly CultureInfo PtBr = new("pt-BR");
 
     /// <summary>
+    /// Cliente, produtos e kits recebidos por ID precisam pertencer à empresa do usuário. Antes, um ID de outra empresa
+    /// era ignorado em silêncio (venda sem baixa de estoque) ou, no cliente, alterava o cadastro alheio.
+    /// </summary>
+    private async Task EnsureReferencesBelongToCompanyAsync(
+        FinalizeSaleRequest request, Dictionary<Guid, Product> products, Dictionary<Guid, Kit> kits, CancellationToken ct)
+    {
+        if (request.Items.Any(i => i.ProductId.HasValue && !products.ContainsKey(i.ProductId.Value)))
+        {
+            throw new ArgumentException("Um dos produtos da venda não foi encontrado.");
+        }
+
+        if (request.Items.Any(i => i.KitId.HasValue && !kits.ContainsKey(i.KitId.Value)))
+        {
+            throw new ArgumentException("Um dos kits da venda não foi encontrado.");
+        }
+
+        if (request.ClientId.HasValue
+            && !await db.Clients.AnyAsync(c => c.Id == request.ClientId && c.CompanyId == currentUser.CompanyId, ct))
+        {
+            throw new ArgumentException("Cliente não encontrado.");
+        }
+    }
+
+    /// <summary>
     /// Preço negativo é inválido. Vender por um preço diferente do cadastro (produto: preço de venda; kit: preço
     /// sugerido) exige a permissão "vendas.alterar-preco" — o front esconde a edição, mas a regra vale aqui também.
     /// </summary>
@@ -162,6 +186,7 @@ public class PosService(GCStockDbContext db, ICurrentUserContext currentUser, IA
             ? await db.Products.Where(p => p.CompanyId == currentUser.CompanyId && productIds.Contains(p.Id)).ToDictionaryAsync(p => p.Id, ct)
             : new Dictionary<Guid, Product>();
 
+        await EnsureReferencesBelongToCompanyAsync(request, products, kits, ct);
         await EnsurePricesAllowedAsync(request, products, kits, ct);
         EnsureStockAvailable(request, products, kits);
         var chosenLots = await LoadChosenLotsAsync(request, products, ct);
@@ -298,7 +323,7 @@ public class PosService(GCStockDbContext db, ICurrentUserContext currentUser, IA
 
             if (request.ClientId.HasValue)
             {
-                var client = await db.Clients.FirstOrDefaultAsync(c => c.Id == request.ClientId, ct);
+                var client = await db.Clients.FirstOrDefaultAsync(c => c.Id == request.ClientId && c.CompanyId == currentUser.CompanyId, ct);
                 if (client is not null)
                 {
                     client.TotalSpent += request.Total;

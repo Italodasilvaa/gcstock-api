@@ -27,6 +27,7 @@ public class PurchaseService(GCStockDbContext db, ICurrentUserContext currentUse
         var items = request.Items ?? [];
         var entryDate = request.EntryDate ?? DateOnly.FromDateTime(now);
         ValidateRequest(request.SupplierName, entryDate, items);
+        await EnsureProductsBelongToCompanyAsync(items, ct);
 
         var saved = new PurchaseEntry
         {
@@ -104,6 +105,7 @@ public class PurchaseService(GCStockDbContext db, ICurrentUserContext currentUse
         var newItems = request.Items ?? [];
         // Valida antes de qualquer alteração: o SaveChanges intermediário abaixo já desfaz o estoque antigo.
         ValidateRequest(request.SupplierName ?? existing.SupplierName, request.EntryDate ?? existing.EntryDate, newItems);
+        await EnsureProductsBelongToCompanyAsync(newItems, ct);
 
         // Produtos afetados tanto pelos itens antigos (a reverter) quanto pelos novos (a aplicar) — a
         // validade "mais próxima" de todos eles precisa ser recalculada no final, mesmo os que saíram da lista.
@@ -310,6 +312,19 @@ public class PurchaseService(GCStockDbContext db, ICurrentUserContext currentUse
         items.Where(i => string.Equals(i.Unit, "kg", StringComparison.OrdinalIgnoreCase)).Sum(i => i.Quantity);
 
     /// <summary>Regras de negócio da compra; ArgumentException vira 400 no endpoint.</summary>
+    /// <summary>Itens vinculados a produto só podem apontar para produtos da empresa (antes um ID alheio era ignorado em silêncio).</summary>
+    private async Task EnsureProductsBelongToCompanyAsync(List<PurchaseItemDto> items, CancellationToken ct)
+    {
+        var productIds = items.Where(i => i.ProductId.HasValue).Select(i => i.ProductId!.Value).Distinct().ToList();
+        if (productIds.Count == 0) return;
+
+        var found = await db.Products.CountAsync(p => p.CompanyId == currentUser.CompanyId && productIds.Contains(p.Id), ct);
+        if (found != productIds.Count)
+        {
+            throw new ArgumentException("Um dos produtos da compra não foi encontrado.");
+        }
+    }
+
     private static void ValidateRequest(string? supplierName, DateOnly entryDate, List<PurchaseItemDto> items)
     {
         if (string.IsNullOrWhiteSpace(supplierName))

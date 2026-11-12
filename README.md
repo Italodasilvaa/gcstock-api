@@ -33,7 +33,7 @@ azure-pipelines.yml
 
 ## API
 
-- **Swagger**: disponível em `/swagger` (Swashbuckle.AspNetCore 7.3.1).
+- **Swagger**: disponível em `/swagger` somente em Development (Swashbuckle.AspNetCore 7.3.1).
 - **CORS**: libera `localhost`, `iwsolutions.cloud` e subdomínios (`*.iwsolutions.cloud`).
 - **Health checks**:
   - `GET /health/live` — verificação de liveness (self, não depende de infraestrutura externa).

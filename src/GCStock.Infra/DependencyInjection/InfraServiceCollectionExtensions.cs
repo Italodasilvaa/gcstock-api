@@ -41,6 +41,8 @@ public static class InfraServiceCollectionExtensions
         services.AddScoped<ICurrentUserContext, HttpCurrentUserContext>();
         services.AddScoped<IPermissionChecker, PermissionChecker>();
         services.AddSingleton<IPasswordHasher, BcryptPasswordHasher>();
+        services.AddSingleton(TimeProvider.System);
+        services.AddSingleton<LoginAttemptTracker>();
         services.AddSingleton<IJwtTokenService, JwtTokenService>();
 
         services.AddScoped<IAuditRecorder, AuditRecorder>();

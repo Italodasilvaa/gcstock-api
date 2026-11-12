@@ -73,7 +73,8 @@ public class EmployeeService(GCStockDbContext db, ICurrentUserContext currentUse
     {
         if (!currentUser.IsOwner) return null;
 
-        var employee = await db.Employees.FirstOrDefaultAsync(e => e.Id == employeeId, ct);
+        // Só funcionários da empresa atual do dono podem ser transferidos; o ID sozinho não basta (isolamento entre empresas).
+        var employee = await db.Employees.FirstOrDefaultAsync(e => e.Id == employeeId && e.CompanyId == currentUser.CompanyId, ct);
         if (employee is null) return null;
 
         var sourceCompany = await db.Companies.FirstOrDefaultAsync(c => c.Id == employee.CompanyId, ct);

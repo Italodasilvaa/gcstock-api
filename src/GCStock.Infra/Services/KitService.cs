@@ -20,6 +20,17 @@ public class KitService(GCStockDbContext db, ICurrentUserContext currentUser, IA
 
     public async Task<KitDto> SaveAsync(SaveKitRequest request, CancellationToken ct)
     {
+        // Componentes só podem apontar para produtos da própria empresa (o ID vem do cliente).
+        var componentProductIds = request.Components?.Select(c => c.ProductId).Distinct().ToList() ?? [];
+        if (componentProductIds.Count > 0)
+        {
+            var found = await db.Products.CountAsync(p => p.CompanyId == currentUser.CompanyId && componentProductIds.Contains(p.Id), ct);
+            if (found != componentProductIds.Count)
+            {
+                throw new ArgumentException("Um dos produtos da composição do kit não foi encontrado.");
+            }
+        }
+
         if (request.Id.HasValue)
         {
             var existing = await db.Kits

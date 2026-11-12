@@ -21,7 +21,7 @@ public class InventoryService(GCStockDbContext db, ICurrentUserContext currentUs
             .Select(b => new StockBatchDto(
                 b.Id, b.ProductId, b.ProductName, b.Sku, b.LotNumber, b.AvailableKg,
                 b.EntryDate, b.ExpiryDate, b.DaysRemaining, b.FiscalDoc, b.Supplier, b.Status, b.Unit, b.UnitCost,
-                db.PurchaseEntries.Where(p => p.Id == b.PurchaseEntryId).Select(p => p.OrderCode).FirstOrDefault() ?? ""))
+                db.PurchaseEntries.Where(p => p.Id == b.PurchaseEntryId && p.CompanyId == b.CompanyId).Select(p => p.OrderCode).FirstOrDefault() ?? ""))
             .ToListAsync(ct);
 
         var batchedByProduct = batches

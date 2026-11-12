@@ -76,10 +76,28 @@ public static class CatalogEndpoints
             Results.Ok(await service.GetAllAsync(ct)));
 
         kits.MapPost("/", async (SaveKitRequest request, IKitService service, CancellationToken ct) =>
-            Results.Created("/api/v1/kits-churrasco", await service.SaveAsync(request, ct))).RequireAuthorization(Permissions.KitsCreate);
+        {
+            try
+            {
+                return Results.Created("/api/v1/kits-churrasco", await service.SaveAsync(request, ct));
+            }
+            catch (ArgumentException ex)
+            {
+                return Results.BadRequest(new { message = ex.Message });
+            }
+        }).RequireAuthorization(Permissions.KitsCreate);
 
         kits.MapPut("/{id:guid}", async (Guid id, SaveKitRequest request, IKitService service, CancellationToken ct) =>
-            Results.Ok(await service.SaveAsync(request with { Id = id }, ct))).RequireAuthorization(Permissions.KitsEdit);
+        {
+            try
+            {
+                return Results.Ok(await service.SaveAsync(request with { Id = id }, ct));
+            }
+            catch (ArgumentException ex)
+            {
+                return Results.BadRequest(new { message = ex.Message });
+            }
+        }).RequireAuthorization(Permissions.KitsEdit);
 
         kits.MapDelete("/{id:guid}", async (Guid id, IKitService service, CancellationToken ct) =>
         {

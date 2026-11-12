@@ -120,8 +120,12 @@ if (app.Environment.IsDevelopment() || migrateOnStartup)
     }
 }
 
-app.UseSwagger();
-app.UseSwaggerUI();
+// Documentação interativa só em desenvolvimento: em Staging/Production ela expõe o mapa completo da API.
+if (app.Environment.IsDevelopment())
+{
+    app.UseSwagger();
+    app.UseSwaggerUI();
+}
 
 app.UseCors(CorsPolicyExtensions.PolicyName);
 

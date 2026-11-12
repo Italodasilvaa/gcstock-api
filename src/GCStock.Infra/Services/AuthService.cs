@@ -4,6 +4,7 @@ using GCStock.Application.Auth;
 using GCStock.Domain.Entities;
 using GCStock.Infra.Database;
 using GCStock.Infra.Mapping;
+using GCStock.Infra.Security;
 using Microsoft.EntityFrameworkCore;
 
 namespace GCStock.Infra.Services;
@@ -13,15 +14,25 @@ public class AuthService(
     IPasswordHasher passwordHasher,
     IJwtTokenService jwtTokenService,
     ICurrentUserContext currentUser,
-    IPermissionChecker permissionChecker) : IAuthService
+    IPermissionChecker permissionChecker,
+    LoginAttemptTracker loginAttempts) : IAuthService
 {
     public async Task<AuthSessionDto> RegisterCompanyAsync(RegisterCompanyRequest request, CancellationToken ct)
     {
         var cleanEmail = request.Email.Trim().ToLowerInvariant();
 
         // Se já existe um Administrator com esse e-mail, a nova empresa é adicionada ao grupo dele
-        // (mesmo dono, N empresas) em vez de criar um dono duplicado.
+        // (mesmo dono, N empresas) em vez de criar um dono duplicado — mas só quem prova ser o dono (senha correta)
+        // pode fazer isso: o cadastro é público e devolve um token de dono do grupo inteiro.
         var admin = await db.Administrators.FirstOrDefaultAsync(a => a.Email.ToLower() == cleanEmail, ct);
+        if (admin is not null && loginAttempts.IsLocked(cleanEmail)) throw new LoginLockedException();
+        if (admin is not null && !passwordHasher.Verify(request.Password ?? string.Empty, admin.PasswordHash))
+        {
+            loginAttempts.RegisterFailure(cleanEmail);
+            throw new UnauthorizedAccessException(
+                "Este e-mail já está cadastrado. Para adicionar outra empresa, informe a senha atual do dono.");
+        }
+
         if (admin is null)
         {
             admin = new Administrator
@@ -96,6 +107,7 @@ public class AuthService(
     public async Task<AuthSessionDto?> LoginAsync(LoginRequest request, CancellationToken ct)
     {
         var cleanEmail = request.Email.Trim().ToLowerInvariant();
+        if (loginAttempts.IsLocked(cleanEmail)) throw new LoginLockedException();
 
         // 1. Dono/administrador (pode ter várias empresas — entra na mais recente).
         var admin = await db.Administrators.FirstOrDefaultAsync(a => a.Email.ToLower() == cleanEmail, ct);
@@ -108,6 +120,7 @@ public class AuthService(
 
             if (company is not null)
             {
+                loginAttempts.RegisterSuccess(cleanEmail);
                 return await BuildSessionAsync(admin, company, employeeId: null, role: "admin", userName: admin.Name, ct: ct);
             }
         }
@@ -119,12 +132,14 @@ public class AuthService(
             var company = await db.Companies.FirstOrDefaultAsync(c => c.Id == employee.CompanyId, ct);
             if (company is not null)
             {
+                loginAttempts.RegisterSuccess(cleanEmail);
                 var employeeAdmin = await db.Administrators.FirstAsync(a => a.Id == company.OwnerId, ct);
                 return await BuildSessionAsync(employeeAdmin, company, employeeId: employee.Id, role: employee.Role, userName: employee.Name,
                     userId: employee.Id, userEmail: employee.Email, ct: ct);
             }
         }
 
+        loginAttempts.RegisterFailure(cleanEmail);
         return null;
     }
 
@@ -157,24 +172,6 @@ public class AuthService(
         var userDto = new AuthUserDto(currentUser.UserId, currentUser.UserName, currentUser.UserEmail, currentUser.Role, currentUser.EmployeeId,
             await permissionChecker.GetCurrentAsync(ct));
         return new AuthSessionDto(userDto, companyDto, token, DateTime.UtcNow);
-    }
-
-    public async Task<List<CompanySummaryDto>> ListCompaniesForLoginAsync(CancellationToken ct)
-    {
-        var companies = await db.Companies.Include(c => c.Owner).OrderByDescending(c => c.CreatedAt).ToListAsync(ct);
-        var result = new List<CompanySummaryDto>();
-        foreach (var c in companies)
-        {
-            result.Add(await c.ToDtoAsync(db, ct));
-        }
-        return result;
-    }
-
-    public async Task<string?> GetCompanyOwnerEmailAsync(Guid companyId, CancellationToken ct)
-    {
-        var company = await db.Companies.FirstOrDefaultAsync(c => c.Id == companyId, ct);
-        if (company is null) return null;
-        return await db.Administrators.Where(a => a.Id == company.OwnerId).Select(a => a.Email).FirstOrDefaultAsync(ct);
     }
 
     private async Task<AuthSessionDto> BuildSessionAsync(
