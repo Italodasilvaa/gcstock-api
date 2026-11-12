@@ -107,8 +107,11 @@ var app = builder.Build();
 
 // Aplica as migrations pendentes em Development ou quando Database:MigrateOnStartup=true (stack da VPS).
 // O seed de demonstração roda somente em Development.
+// Database:DisableStartupMigration=true (usado pelos testes) pula migração e seed, para que subir a API em teste nunca
+// altere o banco configurado nos user-secrets (o nprd da VPS).
 var migrateOnStartup = app.Configuration.GetValue<bool>("Database:MigrateOnStartup");
-if (app.Environment.IsDevelopment() || migrateOnStartup)
+var disableStartupMigration = app.Configuration.GetValue<bool>("Database:DisableStartupMigration");
+if (!disableStartupMigration && (app.Environment.IsDevelopment() || migrateOnStartup))
 {
     using var scope = app.Services.CreateScope();
     var db = scope.ServiceProvider.GetRequiredService<GCStockDbContext>();

@@ -113,7 +113,7 @@ public class FinancialSummaryService(GCStockDbContext db, ICurrentUserContext cu
 
         // ---------- Entradas (compras)
         var purchases = await db.PurchaseEntries
-            .Where(p => p.CompanyId == companyId && p.EntryDate >= from && p.EntryDate <= to)
+            .Where(p => p.CompanyId == companyId && !p.IsDeleted && p.EntryDate >= from && p.EntryDate <= to)
             .Select(p => new { p.SupplierName, p.TotalAmount, p.ShippingCost, p.PaymentStatus })
             .ToListAsync(ct);
 

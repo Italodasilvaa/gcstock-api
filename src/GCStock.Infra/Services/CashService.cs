@@ -45,15 +45,26 @@ public class CashService(GCStockDbContext db, ICurrentUserContext currentUser, I
             new CashMovementDto(r.ReceivedDate ?? r.DueDate, "recebimento", $"Recebido: {r.ClientOrOrigin} ({r.Reference})", r.NetAmount)));
 
         // Saídas: toda nota de entrada (compra) sai do caixa na data da entrada, mesmo a prazo ou ainda não paga.
+        // Compra cancelada que nunca foi paga não saiu do caixa; a já paga continua como saída (o dinheiro saiu) e só
+        // é compensada pela devolução do fornecedor, lançada à parte abaixo.
         var purchases = await db.PurchaseEntries
-            .Where(p => p.CompanyId == companyId)
-            .Select(p => new { p.EntryDate, p.OrderCode, p.SupplierName, p.TotalAmount, p.PaymentStatus })
+            .Where(p => p.CompanyId == companyId && (!p.IsDeleted || p.PaymentStatus == "pago"))
+            .Select(p => new { p.EntryDate, p.OrderCode, p.SupplierName, p.TotalAmount, p.PaymentStatus, p.IsDeleted })
             .ToListAsync(ct);
         movements.AddRange(purchases.Select(p =>
             new CashMovementDto(
                 p.EntryDate, "compra",
-                $"Compra {p.OrderCode} ({p.SupplierName})" + (p.PaymentStatus == "pago" ? "" : " — a pagar"),
+                $"Compra {p.OrderCode} ({p.SupplierName})"
+                    + (p.IsDeleted ? " — cancelada" : p.PaymentStatus == "pago" ? "" : " — a pagar"),
                 -p.TotalAmount)));
+
+        // Entradas: dinheiro devolvido pelo fornecedor por compras pagas e canceladas
+        var refunds = await db.PurchaseRefunds
+            .Where(r => r.CompanyId == companyId)
+            .Select(r => new { r.Date, r.Amount, r.PurchaseEntry!.OrderCode, r.PurchaseEntry.SupplierName })
+            .ToListAsync(ct);
+        movements.AddRange(refunds.Select(r =>
+            new CashMovementDto(r.Date, "devolucao_compra", $"Devolução do fornecedor: {r.SupplierName} (Compra {r.OrderCode})", r.Amount)));
 
         // Saídas: equipamentos e despesas quando pagos (as compras já saíram acima, na entrada)
         var payables = await db.AccountsPayables.Where(p => p.CompanyId == companyId).ToListAsync(ct);
@@ -71,6 +82,7 @@ public class CashService(GCStockDbContext db, ICurrentUserContext currentUser, I
         var contributionsIn = Sum(m => InPeriod(m) && m.Kind == "aporte");
         var salesIn = Sum(m => InPeriod(m) && m.Kind == "venda");
         var receivedIn = Sum(m => InPeriod(m) && m.Kind == "recebimento");
+        var supplierRefundsIn = Sum(m => InPeriod(m) && m.Kind == "devolucao_compra");
         var purchasesOut = -Sum(m => InPeriod(m) && m.Kind == "compra");
         var equipmentOut = -Sum(m => InPeriod(m) && m.Kind == "equipamento");
         var expensesOut = -Sum(m => InPeriod(m) && m.Kind == "despesa");
@@ -89,9 +101,9 @@ public class CashService(GCStockDbContext db, ICurrentUserContext currentUser, I
         return new CashSummaryDto(
             from, to,
             openingBalance,
-            contributionsIn, salesIn, receivedIn, contributionsIn + salesIn + receivedIn,
+            contributionsIn, salesIn, receivedIn, contributionsIn + salesIn + receivedIn + supplierRefundsIn,
             purchasesOut, equipmentOut, expensesOut, purchasesOut + equipmentOut + expensesOut,
-            openingBalance + contributionsIn + salesIn + receivedIn - purchasesOut - equipmentOut - expensesOut,
+            openingBalance + contributionsIn + salesIn + receivedIn + supplierRefundsIn - purchasesOut - equipmentOut - expensesOut,
             Sum(m => m.Date <= today),
             toReceive,
             open.Sum(p => p.Amount),

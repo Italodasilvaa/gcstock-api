@@ -87,8 +87,8 @@ public static class Permissions
         new(KitsDelete, "Excluir kits de churrasco", "Remover kits de churrasco.", "Kits de churrasco"),
 
         new(PurchasesCreate, "Lançar compras", "Registrar novas entradas de compra.", "Compras"),
-        new(PurchasesEdit, "Editar pedidos de compra", "Alterar entradas de compra já lançadas, inclusive as já pagas.", "Compras"),
-        new(PurchasesDelete, "Excluir pedidos de compra", "Apagar uma entrada de compra lançada por engano (estorna estoque e custo; só se nada dela foi vendido).", "Compras"),
+        new(PurchasesEdit, "Editar pedidos de compra", "Alterar entradas de compra já lançadas (compra paga: só fornecedor e nota) e registrar devolução do fornecedor.", "Compras"),
+        new(PurchasesDelete, "Cancelar pedidos de compra", "Cancelar uma entrada de compra lançada por engano (estorna estoque e custo; só se nada dela foi vendido). O histórico é mantido.", "Compras"),
 
         new(SalesCreate, "Realizar vendas", "Finalizar vendas no PDV.", "Vendas (PDV)"),
         new(SalesCancel, "Cancelar vendas", "Cancelar (estornar) vendas já finalizadas: devolve o estoque e desfaz o título a receber.", "Vendas (PDV)"),

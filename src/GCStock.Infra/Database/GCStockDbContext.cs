@@ -24,6 +24,7 @@ public class GCStockDbContext(DbContextOptions<GCStockDbContext> options) : DbCo
 
     public DbSet<PurchaseEntry> PurchaseEntries => Set<PurchaseEntry>();
     public DbSet<PurchaseItem> PurchaseItems => Set<PurchaseItem>();
+    public DbSet<PurchaseRefund> PurchaseRefunds => Set<PurchaseRefund>();
 
     public DbSet<AccountsPayable> AccountsPayables => Set<AccountsPayable>();
     public DbSet<CapitalContribution> CapitalContributions => Set<CapitalContribution>();
@@ -176,10 +177,22 @@ public class GCStockDbContext(DbContextOptions<GCStockDbContext> options) : DbCo
             e.HasKey(x => x.Id);
             e.HasOne(x => x.Company).WithMany().HasForeignKey(x => x.CompanyId).OnDelete(DeleteBehavior.Cascade);
             e.HasIndex(x => x.CompanyId);
+            // Apoia a checagem de nota duplicada (empresa + número da nota); a unicidade em si é garantida no serviço.
+            e.HasIndex(x => new { x.CompanyId, x.NfeNumber });
             e.HasMany(x => x.Items).WithOne(i => i.PurchaseEntry).HasForeignKey(i => i.PurchaseEntryId).OnDelete(DeleteBehavior.Cascade);
+            e.HasMany(x => x.Refunds).WithOne(r => r.PurchaseEntry).HasForeignKey(r => r.PurchaseEntryId).OnDelete(DeleteBehavior.Restrict);
             e.Property(x => x.TotalWeightKg).HasColumnType(qtyType);
             e.Property(x => x.TotalAmount).HasColumnType(moneyType);
             e.Property(x => x.ShippingCost).HasColumnType(moneyType);
+            // Compras anteriores à coluna ficam como não canceladas.
+            e.Property(x => x.IsDeleted).HasDefaultValue(false);
+        });
+
+        modelBuilder.Entity<PurchaseRefund>(e =>
+        {
+            e.HasKey(x => x.Id);
+            e.HasIndex(x => x.CompanyId);
+            e.Property(x => x.Amount).HasColumnType(moneyType);
         });
 
         modelBuilder.Entity<PurchaseItem>(e =>

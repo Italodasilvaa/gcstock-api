@@ -826,6 +826,15 @@ namespace GCStock.Infra.Database.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
+                    b.Property<string>("CancelReason")
+                        .HasColumnType("text");
+
+                    b.Property<DateTime?>("CancelledAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("CancelledBy")
+                        .HasColumnType("text");
+
                     b.Property<Guid>("CompanyId")
                         .HasColumnType("uuid");
 
@@ -835,6 +844,11 @@ namespace GCStock.Infra.Database.Migrations
                     b.Property<string>("EntryTime")
                         .IsRequired()
                         .HasColumnType("text");
+
+                    b.Property<bool>("IsDeleted")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false);
 
                     b.Property<int>("ItemsCount")
                         .HasColumnType("integer");
@@ -892,6 +906,8 @@ namespace GCStock.Infra.Database.Migrations
 
                     b.HasIndex("CompanyId");
 
+                    b.HasIndex("CompanyId", "NfeNumber");
+
                     b.ToTable("PurchaseEntries");
                 });
 
@@ -943,6 +959,43 @@ namespace GCStock.Infra.Database.Migrations
                     b.HasIndex("PurchaseEntryId");
 
                     b.ToTable("PurchaseItems");
+                });
+
+            modelBuilder.Entity("GCStock.Domain.Entities.PurchaseRefund", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("Amount")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<Guid>("CompanyId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("CreatedBy")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<DateOnly>("Date")
+                        .HasColumnType("date");
+
+                    b.Property<string>("Notes")
+                        .HasColumnType("text");
+
+                    b.Property<Guid>("PurchaseEntryId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CompanyId");
+
+                    b.HasIndex("PurchaseEntryId");
+
+                    b.ToTable("PurchaseRefunds");
                 });
 
             modelBuilder.Entity("GCStock.Domain.Entities.SaleItem", b =>
@@ -1494,6 +1547,17 @@ namespace GCStock.Infra.Database.Migrations
                     b.Navigation("PurchaseEntry");
                 });
 
+            modelBuilder.Entity("GCStock.Domain.Entities.PurchaseRefund", b =>
+                {
+                    b.HasOne("GCStock.Domain.Entities.PurchaseEntry", "PurchaseEntry")
+                        .WithMany("Refunds")
+                        .HasForeignKey("PurchaseEntryId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("PurchaseEntry");
+                });
+
             modelBuilder.Entity("GCStock.Domain.Entities.SaleItem", b =>
                 {
                     b.HasOne("GCStock.Domain.Entities.SaleRecord", "SaleRecord")
@@ -1584,6 +1648,8 @@ namespace GCStock.Infra.Database.Migrations
             modelBuilder.Entity("GCStock.Domain.Entities.PurchaseEntry", b =>
                 {
                     b.Navigation("Items");
+
+                    b.Navigation("Refunds");
                 });
 
             modelBuilder.Entity("GCStock.Domain.Entities.SaleItem", b =>

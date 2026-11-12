@@ -24,17 +24,41 @@ public static class PurchaseEndpoints
             }
         }).RequireAuthorization(Permissions.PurchasesCreate);
 
-        group.MapDelete("/{id:guid}", async (Guid id, IPurchaseService service, CancellationToken ct) =>
+        // Compra nunca é apagada: o cancelamento estorna estoque/lotes por movimentações inversas e guarda quem, quando e por quê.
+        group.MapPost("/{id:guid}/cancelar", async (Guid id, CancelPurchaseRequest request, IPurchaseService service, CancellationToken ct) =>
         {
             try
             {
-                return await service.DeleteAsync(id, ct) ? Results.NoContent() : Results.NotFound();
+                var cancelled = await service.CancelAsync(id, request.Reason, ct);
+                return cancelled is not null ? Results.Ok(cancelled) : Results.NotFound();
+            }
+            catch (ArgumentException ex)
+            {
+                return Results.BadRequest(new { message = ex.Message });
             }
             catch (InvalidOperationException ex)
             {
                 return Results.Conflict(new { message = ex.Message });
             }
         }).RequireAuthorization(Permissions.PurchasesDelete);
+
+        // Dinheiro devolvido pelo fornecedor por uma compra paga e cancelada.
+        group.MapPost("/{id:guid}/devolucoes", async (Guid id, RegisterPurchaseRefundRequest request, IPurchaseService service, CancellationToken ct) =>
+        {
+            try
+            {
+                var updated = await service.RegisterRefundAsync(id, request, ct);
+                return updated is not null ? Results.Ok(updated) : Results.NotFound();
+            }
+            catch (ArgumentException ex)
+            {
+                return Results.BadRequest(new { message = ex.Message });
+            }
+            catch (InvalidOperationException ex)
+            {
+                return Results.Conflict(new { message = ex.Message });
+            }
+        }).RequireAuthorization(Permissions.PurchasesEdit);
 
         group.MapPut("/{id:guid}", async (Guid id, SavePurchaseRequest request, IPurchaseService service, CancellationToken ct) =>
         {

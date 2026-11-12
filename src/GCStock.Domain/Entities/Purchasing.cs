@@ -24,7 +24,34 @@ public class PurchaseEntry
     public string PaymentStatus { get; set; } = "pendente";
     public string PaymentMode { get; set; } = "a_prazo";
 
+    /// <summary>
+    /// true = compra cancelada (exclusão lógica). A linha nunca é apagada: continua no histórico, aparece como cancelada
+    /// e não conta no estoque. Quem, quando e por quê ficam em CancelledBy, CancelledAt e CancelReason.
+    /// </summary>
+    public bool IsDeleted { get; set; }
+    public DateTime? CancelledAt { get; set; }
+    public string? CancelledBy { get; set; }
+    public string? CancelReason { get; set; }
+
     public List<PurchaseItem> Items { get; set; } = [];
+
+    /// <summary>Valores devolvidos pelo fornecedor após o cancelamento de uma compra já paga.</summary>
+    public List<PurchaseRefund> Refunds { get; set; } = [];
+}
+
+/// <summary>Devolução financeira do fornecedor por uma compra paga e depois cancelada (entra no caixa na data informada).</summary>
+public class PurchaseRefund
+{
+    public Guid Id { get; set; } = Guid.CreateVersion7();
+    public Guid CompanyId { get; set; }
+    public Guid PurchaseEntryId { get; set; }
+    public PurchaseEntry? PurchaseEntry { get; set; }
+
+    public decimal Amount { get; set; }
+    public DateOnly Date { get; set; }
+    public string? Notes { get; set; }
+    public string CreatedBy { get; set; } = string.Empty;
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 }
 
 public class PurchaseItem

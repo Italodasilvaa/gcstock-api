@@ -32,7 +32,21 @@ public record PurchaseEntryDto(
     string PaymentCondition,
     string PaymentStatus,
     string PaymentMode,
-    List<PurchaseItemDto> Items);
+    List<PurchaseItemDto> Items,
+    bool IsDeleted = false,
+    DateTime? CancelledAt = null,
+    string? CancelledBy = null,
+    string? CancelReason = null,
+    // "nao_aplicavel" | "pendente" | "parcial" | "devolvido" - só existe para compra paga e cancelada.
+    string RefundStatus = "nao_aplicavel",
+    decimal RefundedAmount = 0,
+    List<PurchaseRefundDto>? Refunds = null);
+
+public record PurchaseRefundDto(Guid Id, decimal Amount, DateOnly Date, string? Notes, string CreatedBy, DateTime CreatedAt);
+
+public record CancelPurchaseRequest(string? Reason);
+
+public record RegisterPurchaseRefundRequest(decimal Amount, DateOnly? Date, string? Notes);
 
 public record SavePurchaseRequest(
     string? NfeNumber,
@@ -64,8 +78,12 @@ public interface IPurchaseService
     Task<PurchaseEntryDto?> UpdateAsync(Guid id, SavePurchaseRequest request, CancellationToken ct);
 
     /// <summary>
-    /// Apaga uma entrada lançada por engano: estorna estoque, lotes, movimentações, custo médio e a conta a pagar.
-    /// Recusa (InvalidOperationException) se parte dos lotes já foi vendida ou perdida.
+    /// Cancela uma entrada (nunca apaga): estorna estoque e lotes por movimentações inversas, desfaz o efeito no custo médio
+    /// e preserva o histórico. Compra paga fica com devolução pendente até RegisterRefundAsync. Recusa (InvalidOperationException)
+    /// se parte do que entrou já foi vendida ou perdida. Retorna null se não encontrada.
     /// </summary>
-    Task<bool> DeleteAsync(Guid id, CancellationToken ct);
+    Task<PurchaseEntryDto?> CancelAsync(Guid id, string? reason, CancellationToken ct);
+
+    /// <summary>Registra dinheiro devolvido pelo fornecedor por uma compra paga e cancelada (entra no caixa na data informada).</summary>
+    Task<PurchaseEntryDto?> RegisterRefundAsync(Guid id, RegisterPurchaseRefundRequest request, CancellationToken ct);
 }

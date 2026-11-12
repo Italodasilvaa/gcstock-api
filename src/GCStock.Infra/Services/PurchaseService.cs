@@ -15,6 +15,7 @@ public class PurchaseService(GCStockDbContext db, ICurrentUserContext currentUse
     {
         var purchases = await db.PurchaseEntries
             .Include(p => p.Items)
+            .Include(p => p.Refunds)
             .Where(p => p.CompanyId == currentUser.CompanyId)
             .OrderByDescending(p => p.EntryDate)
             .ToListAsync(ct);
@@ -28,6 +29,15 @@ public class PurchaseService(GCStockDbContext db, ICurrentUserContext currentUse
         var entryDate = request.EntryDate ?? DateOnly.FromDateTime(now);
         ValidateRequest(request.SupplierName, entryDate, items);
         await EnsureProductsBelongToCompanyAsync(items, ct);
+
+        // Tudo-ou-nada. O lock por empresa serializa lançamentos simultâneos: sem ele, duas compras ao mesmo tempo
+        // recebiam o mesmo código PED- e passavam pela checagem de nota duplicada. O lock dos produtos impede que a
+        // soma de estoque se perca se uma venda do mesmo produto acontecer junto.
+        await using var transaction = await db.Database.BeginTransactionAsync(ct);
+        await LockCompanyPurchasesAsync(ct);
+        await EnsureInvoiceNotDuplicatedAsync(
+            request.NfeNumber ?? string.Empty, request.NfeSeries ?? string.Empty, request.SupplierName!, request.SupplierCnpj ?? string.Empty, null, ct);
+        await LockProductsAsync(ProductIdsOf(items), ct);
 
         var saved = new PurchaseEntry
         {
@@ -48,19 +58,7 @@ public class PurchaseService(GCStockDbContext db, ICurrentUserContext currentUse
             PaymentCondition = request.PaymentCondition?.Trim() ?? string.Empty,
             PaymentStatus = "pendente",
             PaymentMode = request.PaymentMode ?? "a_prazo",
-            Items = items.Select(i => new PurchaseItem
-            {
-                ProductId = i.ProductId,
-                Name = i.Name,
-                Code = i.Code,
-                Quantity = i.Quantity,
-                Unit = i.Unit,
-                UnitCost = i.UnitCost,
-                Subtotal = i.Subtotal,
-                ExpiryDate = i.ExpiryDate,
-                LotNumber = i.LotNumber,
-                IsPerishable = i.IsPerishable,
-            }).ToList(),
+            Items = items.Select(NewItem).ToList(),
         };
         db.PurchaseEntries.Add(saved);
 
@@ -83,76 +81,113 @@ public class PurchaseService(GCStockDbContext db, ICurrentUserContext currentUse
 
         await db.SaveChangesAsync(ct);
         await audit.RecordAsync("criou", "Compra / Entrada", $"{saved.OrderCode} • {saved.SupplierName}", null, ct);
+        await transaction.CommitAsync(ct);
         return ToDto(saved);
     }
 
     public async Task<PurchaseEntryDto?> UpdateAsync(Guid id, SavePurchaseRequest request, CancellationToken ct)
     {
-        // A edição desfaz e refaz estoque, lotes, movimentações e itens em vários SaveChanges. A transação garante
-        // tudo-ou-nada (uma falha no meio não deixa o pedido pela metade) e o FOR UPDATE serializa duas edições
-        // simultâneas do mesmo pedido (a segunda espera a primeira terminar, em vez de falhar ou duplicar registros).
+        // A edição pode desfazer e refazer estoque e lotes em vários SaveChanges: a transação garante tudo-ou-nada e
+        // o FOR UPDATE serializa duas edições simultâneas do mesmo pedido.
         await using var transaction = await db.Database.BeginTransactionAsync(ct);
-        await db.Database.ExecuteSqlInterpolatedAsync(
-            $"SELECT 1 FROM \"PurchaseEntries\" WHERE \"Id\" = {id} AND \"CompanyId\" = {currentUser.CompanyId} FOR UPDATE", ct);
+        await LockPurchaseRowAsync(id, ct);
 
         var existing = await db.PurchaseEntries
             .Include(p => p.Items)
+            .Include(p => p.Refunds)
             .FirstOrDefaultAsync(p => p.Id == id && p.CompanyId == currentUser.CompanyId, ct);
         if (existing is null) return null;
 
-        // Compra paga também pode ser editada (exige a permissão "compras.editar", aplicada na rota). O título de
-        // Contas a Pagar permanece pago (SyncPayable não reabre título quitado), mas o valor acompanha o novo total.
+        if (existing.IsDeleted)
+        {
+            throw new InvalidOperationException("Compra cancelada não pode ser editada. Lance uma nova compra.");
+        }
+
         var newItems = request.Items ?? [];
-        // Valida antes de qualquer alteração: o SaveChanges intermediário abaixo já desfaz o estoque antigo.
-        ValidateRequest(request.SupplierName ?? existing.SupplierName, request.EntryDate ?? existing.EntryDate, newItems);
+        var supplierName = request.SupplierName ?? existing.SupplierName;
+        var entryDate = request.EntryDate ?? existing.EntryDate;
+        // Valida antes de qualquer alteração: a reversão de estoque abaixo já grava no banco.
+        ValidateRequest(supplierName, entryDate, newItems);
         await EnsureProductsBelongToCompanyAsync(newItems, ct);
 
-        // Produtos afetados tanto pelos itens antigos (a reverter) quanto pelos novos (a aplicar) — a
-        // validade "mais próxima" de todos eles precisa ser recalculada no final, mesmo os que saíram da lista.
-        var touchedProductIds = existing.Items
-            .Where(i => i.ProductId.HasValue)
-            .Select(i => i.ProductId!.Value)
-            .Concat(newItems.Where(i => i.ProductId.HasValue).Select(i => i.ProductId!.Value))
+        var itemsChanged = !SameItems(existing.Items, newItems);
+        var entryDateChanged = entryDate != existing.EntryDate;
+        var termsChanged = entryDateChanged
+            || (request.ShippingCost is not null && request.ShippingCost.Value != existing.ShippingCost)
+            || (request.PaymentMode is not null && request.PaymentMode != existing.PaymentMode)
+            || (request.PaymentCondition is not null && request.PaymentCondition.Trim() != existing.PaymentCondition);
+
+        // Compra paga: só os dados cadastrais (fornecedor, nota) podem mudar. Itens, valores, pagamento e data de
+        // entrada já viraram estoque, custo e caixa; para mudá-los, cancela-se a compra e lança-se outra.
+        if (existing.PaymentStatus == "pago" && (itemsChanged || termsChanged))
+        {
+            throw new InvalidOperationException(
+                "Compra já paga: itens, quantidades, custos, frete, pagamento e data de entrada não podem ser alterados. " +
+                "Cancele a compra e lance uma nova.");
+        }
+
+        await LockCompanyPurchasesAsync(ct);
+        await EnsureInvoiceNotDuplicatedAsync(
+            request.NfeNumber ?? existing.NfeNumber, request.NfeSeries ?? existing.NfeSeries, supplierName,
+            request.SupplierCnpj ?? existing.SupplierCnpj, existing.Id, ct);
+
+        var changes = new List<string>();
+        void Track(string label, string? before, string? after)
+        {
+            if (before != after) changes.Add($"{label}: {(string.IsNullOrEmpty(before) ? "-" : before)} → {(string.IsNullOrEmpty(after) ? "-" : after)}");
+        }
+
+        var oldCount = existing.ItemsCount;
+        var oldTotal = existing.TotalAmount;
+        var rebuildStock = itemsChanged || entryDateChanged;
+
+        var touchedProductIds = ProductIdsOf(existing.Items)
+            .Concat(ProductIdsOf(newItems))
             .Distinct()
             .ToList();
+        await LockProductsAsync(touchedProductIds, ct);
         var products = touchedProductIds.Count > 0
             ? await db.Products.Where(p => p.CompanyId == currentUser.CompanyId && touchedProductIds.Contains(p.Id)).ToDictionaryAsync(p => p.Id, ct)
             : [];
 
-        // Reverte o efeito da versão antiga: desfaz a soma de estoque e remove lote/movimentação desta compra.
-        foreach (var oldItem in existing.Items)
+        if (rebuildStock)
         {
-            if (oldItem.ProductId.HasValue && products.TryGetValue(oldItem.ProductId.Value, out var product))
-            {
-                RemoveFromAverageCost(product, oldItem.Quantity, oldItem.UnitCost);
-                product.Stock -= oldItem.Quantity;
-            }
+            // Estorna a versão antiga por movimentações inversas (o histórico fica) e recusa se parte já foi vendida.
+            await ReverseStockAsync(existing, existing.Items, products, "Edição da compra", ct);
+            db.PurchaseItems.RemoveRange(existing.Items);
+            await db.SaveChangesAsync(ct);
         }
-        var oldBatches = await db.StockBatches.Where(b => b.PurchaseEntryId == existing.Id).ToListAsync(ct);
-        db.StockBatches.RemoveRange(oldBatches);
-        var oldMovements = await db.StockMovements.Where(m => m.PurchaseEntryId == existing.Id).ToListAsync(ct);
-        db.StockMovements.RemoveRange(oldMovements);
-        db.PurchaseItems.RemoveRange(existing.Items);
 
-        // Sem isso, o recálculo de validade em ApplyItemsToStockAsync consultaria o banco e ainda
-        // encontraria os lotes antigos (a exclusão só é persistida no SaveChanges final), escolhendo
-        // erroneamente uma validade que já não existe mais.
-        await db.SaveChangesAsync(ct);
-
-        if (request.NfeNumber is not null) existing.NfeNumber = request.NfeNumber.Trim();
-        if (request.NfeSeries is not null) existing.NfeSeries = request.NfeSeries.Trim();
-        if (request.EntryDate is not null) existing.EntryDate = request.EntryDate.Value;
-        if (request.SupplierName is not null) existing.SupplierName = request.SupplierName.Trim();
-        if (request.SupplierCnpj is not null) existing.SupplierCnpj = request.SupplierCnpj.Trim();
+        if (request.NfeNumber is not null) { Track("NF-e", existing.NfeNumber, request.NfeNumber.Trim()); existing.NfeNumber = request.NfeNumber.Trim(); }
+        if (request.NfeSeries is not null) { Track("Série", existing.NfeSeries, request.NfeSeries.Trim()); existing.NfeSeries = request.NfeSeries.Trim(); }
+        Track("Data de entrada", existing.EntryDate.ToString("dd/MM/yyyy"), entryDate.ToString("dd/MM/yyyy"));
+        existing.EntryDate = entryDate;
+        if (request.SupplierName is not null) { Track("Fornecedor", existing.SupplierName, request.SupplierName.Trim()); existing.SupplierName = request.SupplierName.Trim(); }
+        if (request.SupplierCnpj is not null) { Track("CNPJ", existing.SupplierCnpj, request.SupplierCnpj.Trim()); existing.SupplierCnpj = request.SupplierCnpj.Trim(); }
         if (request.SupplierCity is not null) existing.SupplierCity = request.SupplierCity.Trim();
         if (request.SupplierSif is not null) existing.SupplierSif = request.SupplierSif.Trim();
-        // Totais sempre derivados dos itens, para não divergirem do que foi somado ao estoque.
-        existing.ItemsCount = newItems.Count;
-        existing.TotalWeightKg = TotalWeightKg(newItems);
-        existing.TotalAmount = newItems.Sum(i => i.Subtotal);
-        if (request.ShippingCost is not null) existing.ShippingCost = request.ShippingCost.Value;
-        if (request.PaymentCondition is not null) existing.PaymentCondition = request.PaymentCondition.Trim();
-        if (request.PaymentMode is not null) existing.PaymentMode = request.PaymentMode;
+        if (request.ShippingCost is not null)
+        {
+            Track("Frete", existing.ShippingCost.ToString("0.00"), request.ShippingCost.Value.ToString("0.00"));
+            existing.ShippingCost = request.ShippingCost.Value;
+        }
+        if (request.PaymentCondition is not null) { Track("Condição de pagamento", existing.PaymentCondition, request.PaymentCondition.Trim()); existing.PaymentCondition = request.PaymentCondition.Trim(); }
+        if (request.PaymentMode is not null) { Track("Forma de pagamento", existing.PaymentMode, request.PaymentMode); existing.PaymentMode = request.PaymentMode; }
+
+        if (rebuildStock)
+        {
+            // Totais sempre derivados dos itens, para não divergirem do que foi somado ao estoque.
+            existing.ItemsCount = newItems.Count;
+            existing.TotalWeightKg = TotalWeightKg(newItems);
+            existing.TotalAmount = newItems.Sum(i => i.Subtotal);
+            changes.Add($"Itens: {oldCount} item(ns) {oldTotal:C} → {existing.ItemsCount} item(ns) {existing.TotalAmount:C}");
+
+            var rebuiltItems = newItems.Select(NewItem).ToList();
+            existing.Items = rebuiltItems;
+            // O Id do item é gerado no construtor; sem o Add explícito o EF o trata como já existente e tenta UPDATE
+            // (DbUpdateConcurrencyException: 0 linhas afetadas). Add marca como inserção.
+            db.PurchaseItems.AddRange(rebuiltItems);
+        }
 
         // A conta a pagar acompanha a compra editada (valor, fornecedor, NF-e, emissão e vencimento).
         var payable = await db.AccountsPayables
@@ -164,75 +199,284 @@ public class PurchaseService(GCStockDbContext db, ICurrentUserContext currentUse
             MarkAsPaid(existing, payable);
         }
 
-        var rebuiltItems = newItems.Select(i => new PurchaseItem
+        if (rebuildStock)
         {
-            ProductId = i.ProductId,
-            Name = i.Name,
-            Code = i.Code,
-            Quantity = i.Quantity,
-            Unit = i.Unit,
-            UnitCost = i.UnitCost,
-            Subtotal = i.Subtotal,
-            ExpiryDate = i.ExpiryDate,
-            LotNumber = i.LotNumber,
-            IsPerishable = i.IsPerishable,
-        }).ToList();
-        existing.Items = rebuiltItems;
-        // O Id do item é gerado no construtor; sem o Add explícito o EF o trata como já existente e tenta UPDATE
-        // (DbUpdateConcurrencyException: 0 linhas afetadas). Add marca como inserção.
-        db.PurchaseItems.AddRange(rebuiltItems);
-
-        await ApplyItemsToStockAsync(existing, newItems, ct, products, touchedProductIds);
+            await ApplyItemsToStockAsync(existing, newItems, ct, products, touchedProductIds);
+        }
+        else
+        {
+            // Sem mexer em estoque: os lotes só acompanham os dados da nota e do fornecedor.
+            var batches = await ActiveBatchesAsync(existing.Id, ct);
+            foreach (var batch in batches)
+            {
+                batch.FiscalDoc = existing.NfeNumber;
+                batch.Supplier = existing.SupplierName;
+            }
+        }
 
         await db.SaveChangesAsync(ct);
-        await audit.RecordAsync("editou", "Compra / Entrada", $"{existing.OrderCode} • {existing.SupplierName}", null, ct);
+        await audit.RecordAsync(
+            "editou", "Compra / Entrada", $"{existing.OrderCode} • {existing.SupplierName}",
+            changes.Count > 0 ? string.Join("; ", changes) : null, ct);
         await transaction.CommitAsync(ct);
         return ToDto(existing);
     }
 
-    public async Task<bool> DeleteAsync(Guid id, CancellationToken ct)
+    public async Task<PurchaseEntryDto?> CancelAsync(Guid id, string? reason, CancellationToken ct)
     {
+        var cleanReason = reason?.Trim();
+        if (string.IsNullOrEmpty(cleanReason)) throw new ArgumentException("Informe o motivo do cancelamento.");
+
         await using var transaction = await db.Database.BeginTransactionAsync(ct);
-        await db.Database.ExecuteSqlInterpolatedAsync(
-            $"SELECT 1 FROM \"PurchaseEntries\" WHERE \"Id\" = {id} AND \"CompanyId\" = {currentUser.CompanyId} FOR UPDATE", ct);
+        await LockPurchaseRowAsync(id, ct);
 
         var existing = await db.PurchaseEntries
             .Include(p => p.Items)
+            .Include(p => p.Refunds)
             .FirstOrDefaultAsync(p => p.Id == id && p.CompanyId == currentUser.CompanyId, ct);
-        if (existing is null) return false;
+        if (existing is null) return null;
+        if (existing.IsDeleted) throw new InvalidOperationException("Esta compra já foi cancelada.");
 
-        var batches = await db.StockBatches.Where(b => b.PurchaseEntryId == existing.Id).ToListAsync(ct);
-        var received = existing.Items.Where(i => i.ProductId.HasValue).Sum(i => i.Quantity);
-        if (batches.Sum(b => b.AvailableKg) + 0.0005m < received)
-        {
-            throw new InvalidOperationException(
-                $"Parte do pedido {existing.OrderCode} já foi vendida ou perdida. Cancele as vendas/perdas dele antes de excluir, ou edite a compra.");
-        }
-
-        var productIds = existing.Items.Where(i => i.ProductId.HasValue).Select(i => i.ProductId!.Value).Distinct().ToList();
+        var productIds = ProductIdsOf(existing.Items);
+        await LockProductsAsync(productIds, ct);
         var products = productIds.Count > 0
             ? await db.Products.Where(p => p.CompanyId == currentUser.CompanyId && productIds.Contains(p.Id)).ToDictionaryAsync(p => p.Id, ct)
             : [];
 
-        foreach (var item in existing.Items)
+        // Falha aqui (InvalidOperationException) se parte do que entrou já foi vendida ou perdida: nada é gravado.
+        await ReverseStockAsync(existing, existing.Items, products, $"Cancelamento: {cleanReason}", ct);
+
+        var wasPaid = existing.PaymentStatus == "pago";
+        existing.IsDeleted = true;
+        existing.CancelledAt = DateTime.UtcNow;
+        existing.CancelledBy = currentUser.UserName;
+        existing.CancelReason = cleanReason;
+
+        // Título ainda em aberto não representa dinheiro que saiu: some das contas a pagar. Título já pago é
+        // movimentação financeira e fica intacto; o que falta é a devolução do fornecedor (RegisterRefundAsync).
+        if (!wasPaid)
         {
-            if (item.ProductId.HasValue && products.TryGetValue(item.ProductId.Value, out var product))
+            var openPayables = await db.AccountsPayables
+                .Where(p => p.PurchaseEntryId == existing.Id && p.CompanyId == currentUser.CompanyId && p.Status != "pago")
+                .ToListAsync(ct);
+            db.AccountsPayables.RemoveRange(openPayables);
+        }
+
+        await db.SaveChangesAsync(ct);
+        await RefreshProductsAfterReversalAsync(products.Values, ct);
+        await db.SaveChangesAsync(ct);
+
+        await audit.RecordAsync(
+            "cancelou", "Compra / Entrada", $"{existing.OrderCode} • {existing.SupplierName}",
+            $"Motivo: {cleanReason}" + (wasPaid ? " • Compra já paga: devolução do fornecedor pendente" : null), ct);
+        await transaction.CommitAsync(ct);
+        return ToDto(existing);
+    }
+
+    public async Task<PurchaseEntryDto?> RegisterRefundAsync(Guid id, RegisterPurchaseRefundRequest request, CancellationToken ct)
+    {
+        await using var transaction = await db.Database.BeginTransactionAsync(ct);
+        await LockPurchaseRowAsync(id, ct);
+
+        var existing = await db.PurchaseEntries
+            .Include(p => p.Items)
+            .Include(p => p.Refunds)
+            .FirstOrDefaultAsync(p => p.Id == id && p.CompanyId == currentUser.CompanyId, ct);
+        if (existing is null) return null;
+
+        if (!existing.IsDeleted || existing.PaymentStatus != "pago")
+        {
+            throw new InvalidOperationException("Só é possível registrar devolução de uma compra paga que foi cancelada.");
+        }
+
+        var amount = Math.Round(request.Amount, 2, MidpointRounding.AwayFromZero);
+        if (amount <= 0) throw new ArgumentException("Informe o valor devolvido pelo fornecedor.");
+
+        var alreadyRefunded = existing.Refunds.Sum(r => r.Amount);
+        if (alreadyRefunded + amount > existing.TotalAmount + 0.005m)
+        {
+            throw new ArgumentException(
+                $"O valor passa do que foi pago: já foram devolvidos {alreadyRefunded:C} de {existing.TotalAmount:C}.");
+        }
+
+        var today = DateOnly.FromDateTime(DateTime.UtcNow.AddHours(-3));
+        var date = request.Date ?? today;
+        if (date > today.AddDays(1)) throw new ArgumentException("A data da devolução não pode ser no futuro.");
+
+        var refund = new PurchaseRefund
+        {
+            CompanyId = currentUser.CompanyId,
+            PurchaseEntryId = existing.Id,
+            Amount = amount,
+            Date = date,
+            Notes = string.IsNullOrWhiteSpace(request.Notes) ? null : request.Notes.Trim(),
+            CreatedBy = currentUser.UserName,
+        };
+        db.PurchaseRefunds.Add(refund);
+        await db.SaveChangesAsync(ct);
+
+        await audit.RecordAsync(
+            "registrou devolução", "Compra / Entrada", $"{existing.OrderCode} • {existing.SupplierName}",
+            $"Devolvido pelo fornecedor: {amount:C} em {date:dd/MM/yyyy}", ct);
+        await transaction.CommitAsync(ct);
+        return ToDto(existing);
+    }
+
+    private async Task LockPurchaseRowAsync(Guid id, CancellationToken ct) =>
+        await db.Database.ExecuteSqlInterpolatedAsync(
+            $"SELECT 1 FROM \"PurchaseEntries\" WHERE \"Id\" = {id} AND \"CompanyId\" = {currentUser.CompanyId} FOR UPDATE", ct);
+
+    /// <summary>Serializa os lançamentos de compra da empresa (código PED- e nota duplicada) até o fim da transação.</summary>
+    private async Task LockCompanyPurchasesAsync(CancellationToken ct) =>
+        await db.Database.ExecuteSqlInterpolatedAsync(
+            $"SELECT pg_advisory_xact_lock(hashtextextended({currentUser.CompanyId.ToString()}, 0))", ct);
+
+    /// <summary>Trava os produtos até o fim da transação (a venda faz o mesmo): somas e estornos de estoque não se perdem.</summary>
+    private async Task LockProductsAsync(IReadOnlyCollection<Guid> productIds, CancellationToken ct)
+    {
+        if (productIds.Count == 0) return;
+        var ids = productIds.ToArray();
+        await db.Database.ExecuteSqlInterpolatedAsync(
+            $"SELECT 1 FROM \"Products\" WHERE \"Id\" = ANY({ids}) AND \"CompanyId\" = {currentUser.CompanyId} FOR UPDATE", ct);
+    }
+
+    private static List<Guid> ProductIdsOf(IEnumerable<PurchaseItemDto> items) =>
+        items.Where(i => i.ProductId.HasValue).Select(i => i.ProductId!.Value).Distinct().ToList();
+
+    private static List<Guid> ProductIdsOf(IEnumerable<PurchaseItem> items) =>
+        items.Where(i => i.ProductId.HasValue).Select(i => i.ProductId!.Value).Distinct().ToList();
+
+    private static PurchaseItem NewItem(PurchaseItemDto i) => new()
+    {
+        ProductId = i.ProductId,
+        Name = i.Name,
+        Code = i.Code,
+        Quantity = i.Quantity,
+        Unit = i.Unit,
+        UnitCost = i.UnitCost,
+        Subtotal = i.Subtotal,
+        ExpiryDate = i.ExpiryDate,
+        LotNumber = i.LotNumber,
+        IsPerishable = i.IsPerishable,
+    };
+
+    /// <summary>Os itens enviados são os mesmos já gravados? (ordem não importa)</summary>
+    private static bool SameItems(List<PurchaseItem> current, List<PurchaseItemDto> incoming)
+    {
+        if (current.Count != incoming.Count) return false;
+
+        var a = current
+            .Select(i => (i.ProductId, i.Name, i.Code, i.Quantity, i.Unit, i.UnitCost, i.Subtotal, i.ExpiryDate, LotNumber: i.LotNumber ?? string.Empty, i.IsPerishable))
+            .OrderBy(x => x.ProductId).ThenBy(x => x.Name).ThenBy(x => x.LotNumber).ThenBy(x => x.Quantity).ThenBy(x => x.UnitCost)
+            .ToList();
+        var b = incoming
+            .Select(i => (i.ProductId, i.Name, i.Code, i.Quantity, i.Unit, i.UnitCost, i.Subtotal, i.ExpiryDate, LotNumber: i.LotNumber ?? string.Empty, i.IsPerishable))
+            .OrderBy(x => x.ProductId).ThenBy(x => x.Name).ThenBy(x => x.LotNumber).ThenBy(x => x.Quantity).ThenBy(x => x.UnitCost)
+            .ToList();
+
+        return a.Zip(b).All(pair => pair.First.Equals(pair.Second));
+    }
+
+    /// <summary>Mesma nota (número + série) do mesmo fornecedor não pode ser lançada duas vezes; compra cancelada não conta.</summary>
+    private async Task EnsureInvoiceNotDuplicatedAsync(
+        string nfeNumber, string nfeSeries, string supplierName, string supplierCnpj, Guid? ignoreId, CancellationToken ct)
+    {
+        var number = nfeNumber.Trim();
+        if (number.Length == 0) return;
+
+        var series = nfeSeries.Trim();
+        var candidates = await db.PurchaseEntries
+            .Where(p => p.CompanyId == currentUser.CompanyId && !p.IsDeleted
+                && p.NfeNumber == number && p.NfeSeries == series && (ignoreId == null || p.Id != ignoreId))
+            .Select(p => new { p.OrderCode, p.SupplierName, p.SupplierCnpj })
+            .ToListAsync(ct);
+
+        var cnpj = OnlyDigits(supplierCnpj);
+        var name = supplierName.Trim();
+        var duplicate = candidates.FirstOrDefault(c =>
+        {
+            var otherCnpj = OnlyDigits(c.SupplierCnpj);
+            return cnpj.Length > 0 && otherCnpj.Length > 0
+                ? cnpj == otherCnpj
+                : string.Equals(c.SupplierName.Trim(), name, StringComparison.OrdinalIgnoreCase);
+        });
+
+        if (duplicate is not null)
+        {
+            throw new ArgumentException(
+                $"A NF-e {number}{(series.Length > 0 ? $" (série {series})" : "")} deste fornecedor já foi lançada na compra {duplicate.OrderCode}. " +
+                "Se ela foi lançada errada, cancele-a antes de lançar de novo.");
+        }
+
+        static string OnlyDigits(string value) => new(value.Where(char.IsDigit).ToArray());
+    }
+
+    private async Task<List<StockBatch>> ActiveBatchesAsync(Guid purchaseEntryId, CancellationToken ct) =>
+        await db.StockBatches
+            .Where(b => b.PurchaseEntryId == purchaseEntryId && b.CompanyId == currentUser.CompanyId && b.Status != "cancelado")
+            .ToListAsync(ct);
+
+    /// <summary>
+    /// Estorna o que a compra somou ao estoque sem apagar histórico: tira do estoque do produto e do custo médio, zera os
+    /// lotes (a linha continua, marcada "cancelado") e grava uma movimentação inversa por item. Recusa se algo já saiu.
+    /// </summary>
+    private async Task ReverseStockAsync(
+        PurchaseEntry entry, List<PurchaseItem> items, Dictionary<Guid, Product> products, string reason, CancellationToken ct)
+    {
+        var batches = await ActiveBatchesAsync(entry.Id, ct);
+
+        // Nada do que entrou pode ter saído (venda, perda, ajuste manual): o estorno deixaria o estoque negativo.
+        var received = items
+            .Where(i => i.ProductId.HasValue && products.ContainsKey(i.ProductId.Value))
+            .GroupBy(i => i.ProductId!.Value)
+            .ToDictionary(g => g.Key, g => g.Sum(i => i.Quantity));
+        foreach (var (productId, quantity) in received)
+        {
+            var availableInLots = batches.Where(b => b.ProductId == productId).Sum(b => b.AvailableKg);
+            if (availableInLots + 0.0005m < quantity || products[productId].Stock + 0.0005m < quantity)
             {
-                RemoveFromAverageCost(product, item.Quantity, item.UnitCost);
-                product.Stock = Math.Max(0, product.Stock - item.Quantity);
+                throw new InvalidOperationException(
+                    $"Parte do pedido {entry.OrderCode} já foi vendida, perdida ou ajustada. " +
+                    "Cancele as vendas/perdas dele antes de alterar ou cancelar a compra.");
             }
         }
 
-        db.StockBatches.RemoveRange(batches);
-        db.StockMovements.RemoveRange(await db.StockMovements.Where(m => m.PurchaseEntryId == existing.Id).ToListAsync(ct));
-        db.AccountsPayables.RemoveRange(await db.AccountsPayables.Where(p => p.PurchaseEntryId == existing.Id && p.CompanyId == currentUser.CompanyId).ToListAsync(ct));
-        db.PurchaseItems.RemoveRange(existing.Items);
-        db.PurchaseEntries.Remove(existing);
-        await db.SaveChangesAsync(ct);
+        var now = DateTime.UtcNow;
+        foreach (var item in items)
+        {
+            if (!item.ProductId.HasValue || !products.TryGetValue(item.ProductId.Value, out var product)) continue;
 
-        // Validade mais próxima dos produtos afetados, agora sem os lotes deste pedido.
+            RemoveFromAverageCost(product, item.Quantity, item.UnitCost);
+            product.Stock = Math.Max(0, product.Stock - item.Quantity);
+
+            db.StockMovements.Add(new StockMovement
+            {
+                CompanyId = currentUser.CompanyId,
+                Timestamp = now,
+                Type = "estorno_compra",
+                Title = $"Estorno: {item.Name}",
+                DocInfo = $"NF-e {entry.NfeNumber}",
+                AmountKg = -item.Quantity,
+                Unit = product.Unit,
+                Description = $"{reason} • Compra {entry.OrderCode} • Fornecedor {entry.SupplierName}",
+                BadgeLabel = "Estorno",
+                AuditLink = entry.OrderCode,
+                PurchaseEntryId = entry.Id,
+            });
+        }
+
+        foreach (var batch in batches)
+        {
+            batch.AvailableKg = 0;
+            batch.Status = "cancelado";
+        }
+    }
+
+    /// <summary>Depois de um estorno gravado: validade mais próxima e, se os lotes que sobraram cobrem o estoque, custo médio deles.</summary>
+    private async Task RefreshProductsAfterReversalAsync(IEnumerable<Product> products, CancellationToken ct)
+    {
         var now = DateOnly.FromDateTime(DateTime.UtcNow.AddHours(-3));
-        foreach (var product in products.Values)
+        foreach (var product in products)
         {
             var nearest = await db.StockBatches
                 .Where(b => b.ProductId == product.Id && b.CompanyId == currentUser.CompanyId && b.AvailableKg > 0)
@@ -256,11 +500,6 @@ public class PurchaseService(GCStockDbContext db, ICurrentUserContext currentUse
                 product.CostPrice = Math.Round(remaining.Sum(b => b.AvailableKg * b.UnitCost) / remainingQty, 2, MidpointRounding.AwayFromZero);
             }
         }
-
-        await db.SaveChangesAsync(ct);
-        await audit.RecordAsync("excluiu", "Compra / Entrada", $"{existing.OrderCode} • {existing.SupplierName}", null, ct);
-        await transaction.CommitAsync(ct);
-        return true;
     }
 
     private static bool IsPaidOnEntry(string paymentMode) => paymentMode is "pix" or "dinheiro" or "cartao";
@@ -470,7 +709,7 @@ public class PurchaseService(GCStockDbContext db, ICurrentUserContext currentUse
 
             newBatchesByProduct.TryGetValue(productId, out var newBatches);
             var existingBatches = await db.StockBatches
-                .Where(b => b.ProductId == productId && b.CompanyId == currentUser.CompanyId)
+                .Where(b => b.ProductId == productId && b.CompanyId == currentUser.CompanyId && b.Status != "cancelado")
                 .Select(b => new { b.ExpiryDate, b.LotNumber })
                 .ToListAsync(ct);
 
@@ -500,10 +739,22 @@ public class PurchaseService(GCStockDbContext db, ICurrentUserContext currentUse
         await StockLots.ReconcileAsync(db, currentUser.CompanyId, [.. productIdsToRecompute.Where(products.ContainsKey).Select(id => products[id])], ct);
     }
 
-    private static PurchaseEntryDto ToDto(PurchaseEntry p) => new(
-        p.Id, p.OrderCode, p.NfeNumber, p.NfeSeries, p.EntryDate, p.EntryTime, p.SupplierName, p.SupplierCnpj,
-        p.SupplierCity, p.SupplierSif, p.ItemsCount, p.TotalWeightKg, p.TotalAmount, p.ShippingCost,
-        p.PaymentCondition, p.PaymentStatus, p.PaymentMode,
-        p.Items.Select(i => new PurchaseItemDto(
-            i.Name, i.Code, i.Quantity, i.Unit, i.UnitCost, i.Subtotal, i.ExpiryDate, i.LotNumber, i.IsPerishable, i.Id, i.ProductId)).ToList());
+    private static PurchaseEntryDto ToDto(PurchaseEntry p)
+    {
+        var refunded = p.Refunds.Sum(r => r.Amount);
+        // Devolução só existe para compra paga e cancelada; enquanto não houver devolução registrada, fica pendente.
+        var refundStatus = p.IsDeleted && p.PaymentStatus == "pago"
+            ? refunded <= 0 ? "pendente" : refunded + 0.005m < p.TotalAmount ? "parcial" : "devolvido"
+            : "nao_aplicavel";
+
+        return new PurchaseEntryDto(
+            p.Id, p.OrderCode, p.NfeNumber, p.NfeSeries, p.EntryDate, p.EntryTime, p.SupplierName, p.SupplierCnpj,
+            p.SupplierCity, p.SupplierSif, p.ItemsCount, p.TotalWeightKg, p.TotalAmount, p.ShippingCost,
+            p.PaymentCondition, p.PaymentStatus, p.PaymentMode,
+            p.Items.Select(i => new PurchaseItemDto(
+                i.Name, i.Code, i.Quantity, i.Unit, i.UnitCost, i.Subtotal, i.ExpiryDate, i.LotNumber, i.IsPerishable, i.Id, i.ProductId)).ToList(),
+            p.IsDeleted, p.CancelledAt, p.CancelledBy, p.CancelReason, refundStatus, refunded,
+            p.Refunds.OrderBy(r => r.Date).ThenBy(r => r.CreatedAt)
+                .Select(r => new PurchaseRefundDto(r.Id, r.Amount, r.Date, r.Notes, r.CreatedBy, r.CreatedAt)).ToList());
+    }
 }
