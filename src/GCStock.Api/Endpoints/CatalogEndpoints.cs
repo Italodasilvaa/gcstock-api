@@ -12,6 +12,9 @@ public static class CatalogEndpoints
         products.MapGet("/", async (IProductService service, CancellationToken ct) =>
             Results.Ok(await service.GetAllAsync(ct)));
 
+        products.MapGet("/{id:guid}/historico-custo", async (Guid id, IProductService service, CancellationToken ct) =>
+            Results.Ok(await service.GetCostHistoryAsync(id, ct)));
+
         products.MapPost("/", async (SaveProductRequest request, IProductService service, CancellationToken ct) =>
             Results.Created("/api/v1/produtos", await service.SaveAsync(request, ct))).RequireAuthorization(Permissions.ProductsCreate);
 

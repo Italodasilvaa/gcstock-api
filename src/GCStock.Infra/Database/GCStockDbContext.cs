@@ -25,6 +25,7 @@ public class GCStockDbContext(DbContextOptions<GCStockDbContext> options) : DbCo
     public DbSet<PurchaseEntry> PurchaseEntries => Set<PurchaseEntry>();
     public DbSet<PurchaseItem> PurchaseItems => Set<PurchaseItem>();
     public DbSet<PurchaseRefund> PurchaseRefunds => Set<PurchaseRefund>();
+    public DbSet<ProductCostHistory> ProductCostHistories => Set<ProductCostHistory>();
 
     public DbSet<AccountsPayable> AccountsPayables => Set<AccountsPayable>();
     public DbSet<CapitalContribution> CapitalContributions => Set<CapitalContribution>();
@@ -50,6 +51,8 @@ public class GCStockDbContext(DbContextOptions<GCStockDbContext> options) : DbCo
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         const string moneyType = "decimal(18,2)";
+        // Custo unitário (por kg/un): 4 casas, para o custo médio não acumular erro de arredondamento a cada compra.
+        const string unitCostType = "decimal(18,4)";
         const string qtyType = "decimal(18,3)";
         const string percentType = "decimal(9,4)";
 
@@ -93,7 +96,7 @@ public class GCStockDbContext(DbContextOptions<GCStockDbContext> options) : DbCo
             e.HasIndex(x => x.CompanyId);
             e.Property(x => x.Stock).HasColumnType(qtyType);
             e.Property(x => x.MinStock).HasColumnType(qtyType);
-            e.Property(x => x.CostPrice).HasColumnType(moneyType);
+            e.Property(x => x.CostPrice).HasColumnType(unitCostType);
             e.Property(x => x.SellingPrice).HasColumnType(moneyType);
         });
 
@@ -123,7 +126,7 @@ public class GCStockDbContext(DbContextOptions<GCStockDbContext> options) : DbCo
         {
             e.HasKey(x => x.Id);
             e.Property(x => x.Quantity).HasColumnType(qtyType);
-            e.Property(x => x.UnitCost).HasColumnType(moneyType);
+            e.Property(x => x.UnitCost).HasColumnType(unitCostType);
             e.Property(x => x.Subtotal).HasColumnType(moneyType);
             e.Property(x => x.AvailableStock).HasColumnType(qtyType);
         });
@@ -134,7 +137,7 @@ public class GCStockDbContext(DbContextOptions<GCStockDbContext> options) : DbCo
             e.HasOne(x => x.Company).WithMany().HasForeignKey(x => x.CompanyId).OnDelete(DeleteBehavior.Cascade);
             e.HasIndex(x => x.CompanyId);
             e.Property(x => x.AvailableKg).HasColumnType(qtyType);
-            e.Property(x => x.UnitCost).HasColumnType(moneyType);
+            e.Property(x => x.UnitCost).HasColumnType(unitCostType);
         });
 
         modelBuilder.Entity<StockMovement>(e =>
@@ -159,7 +162,7 @@ public class GCStockDbContext(DbContextOptions<GCStockDbContext> options) : DbCo
             e.HasOne(x => x.Company).WithMany().HasForeignKey(x => x.CompanyId).OnDelete(DeleteBehavior.Cascade);
             e.HasIndex(x => new { x.CompanyId, x.Date });
             e.Property(x => x.Qty).HasColumnType(qtyType);
-            e.Property(x => x.UnitCost).HasColumnType(moneyType);
+            e.Property(x => x.UnitCost).HasColumnType(unitCostType);
             e.Property(x => x.TotalCost).HasColumnType(moneyType);
             e.Property(x => x.Status).HasMaxLength(20).HasDefaultValue("ativa");
         });
@@ -195,11 +198,19 @@ public class GCStockDbContext(DbContextOptions<GCStockDbContext> options) : DbCo
             e.Property(x => x.Amount).HasColumnType(moneyType);
         });
 
+        modelBuilder.Entity<ProductCostHistory>(e =>
+        {
+            e.HasKey(x => x.Id);
+            e.HasIndex(x => new { x.CompanyId, x.ProductId, x.CreatedAt });
+            e.Property(x => x.PreviousCost).HasColumnType(unitCostType);
+            e.Property(x => x.NewCost).HasColumnType(unitCostType);
+        });
+
         modelBuilder.Entity<PurchaseItem>(e =>
         {
             e.HasKey(x => x.Id);
             e.Property(x => x.Quantity).HasColumnType(qtyType);
-            e.Property(x => x.UnitCost).HasColumnType(moneyType);
+            e.Property(x => x.UnitCost).HasColumnType(unitCostType);
             e.Property(x => x.Subtotal).HasColumnType(moneyType);
         });
 
@@ -286,7 +297,7 @@ public class GCStockDbContext(DbContextOptions<GCStockDbContext> options) : DbCo
             e.Property(x => x.Qty).HasColumnType(qtyType);
             e.Property(x => x.UnitPrice).HasColumnType(moneyType);
             e.Property(x => x.Subtotal).HasColumnType(moneyType);
-            e.Property(x => x.UnitCost).HasColumnType(moneyType);
+            e.Property(x => x.UnitCost).HasColumnType(unitCostType);
             e.Property(x => x.TotalCost).HasColumnType(moneyType);
         });
 

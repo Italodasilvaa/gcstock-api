@@ -47,9 +47,16 @@ public record SaveProductRequest(
     string? SubLocation,
     bool? IsPromo);
 
+/// <summary>Uma mudança do custo médio do produto. Source: "compra" | "edicao_compra" | "cancelamento_compra" | "ajuste_manual".</summary>
+public record ProductCostHistoryDto(
+    Guid Id, decimal PreviousCost, decimal NewCost, string Source, string? PurchaseCode, DateTime CreatedAt, string CreatedBy);
+
 public interface IProductService
 {
     Task<List<ProductDto>> GetAllAsync(CancellationToken ct);
+
+    /// <summary>Histórico de custo médio do produto, do mais recente para o mais antigo. O das vendas já feitas não muda.</summary>
+    Task<List<ProductCostHistoryDto>> GetCostHistoryAsync(Guid productId, CancellationToken ct);
     Task<ProductDto> SaveAsync(SaveProductRequest request, CancellationToken ct);
     Task DeleteAsync(Guid id, CancellationToken ct);
 }

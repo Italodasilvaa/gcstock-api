@@ -643,7 +643,7 @@ namespace GCStock.Infra.Database.Migrations
                         .HasColumnType("text");
 
                     b.Property<decimal>("UnitCost")
-                        .HasColumnType("decimal(18,2)");
+                        .HasColumnType("decimal(18,4)");
 
                     b.HasKey("Id");
 
@@ -721,7 +721,7 @@ namespace GCStock.Infra.Database.Migrations
                         .HasColumnType("uuid");
 
                     b.Property<decimal>("CostPrice")
-                        .HasColumnType("decimal(18,2)");
+                        .HasColumnType("decimal(18,4)");
 
                     b.Property<string>("Ean")
                         .IsRequired()
@@ -818,6 +818,52 @@ namespace GCStock.Infra.Database.Migrations
                         .IsUnique();
 
                     b.ToTable("ProductCategories");
+                });
+
+            modelBuilder.Entity("GCStock.Domain.Entities.ProductCostHistory", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("CompanyId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("CreatedBy")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<decimal>("NewCost")
+                        .HasColumnType("decimal(18,4)");
+
+                    b.Property<decimal>("PreviousCost")
+                        .HasColumnType("decimal(18,4)");
+
+                    b.Property<Guid>("ProductId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ProductName")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("PurchaseCode")
+                        .HasColumnType("text");
+
+                    b.Property<Guid?>("PurchaseEntryId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Source")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CompanyId", "ProductId", "CreatedAt");
+
+                    b.ToTable("ProductCostHistories");
                 });
 
             modelBuilder.Entity("GCStock.Domain.Entities.PurchaseEntry", b =>
@@ -952,7 +998,7 @@ namespace GCStock.Infra.Database.Migrations
                         .HasColumnType("text");
 
                     b.Property<decimal>("UnitCost")
-                        .HasColumnType("decimal(18,2)");
+                        .HasColumnType("decimal(18,4)");
 
                     b.HasKey("Id");
 
@@ -1037,7 +1083,7 @@ namespace GCStock.Infra.Database.Migrations
                         .HasColumnType("text");
 
                     b.Property<decimal>("UnitCost")
-                        .HasColumnType("decimal(18,2)");
+                        .HasColumnType("decimal(18,4)");
 
                     b.Property<decimal>("UnitPrice")
                         .HasColumnType("decimal(18,2)");
@@ -1203,7 +1249,7 @@ namespace GCStock.Infra.Database.Migrations
                         .HasColumnType("text");
 
                     b.Property<decimal>("UnitCost")
-                        .HasColumnType("decimal(18,2)");
+                        .HasColumnType("decimal(18,4)");
 
                     b.HasKey("Id");
 
@@ -1276,7 +1322,7 @@ namespace GCStock.Infra.Database.Migrations
                         .HasColumnType("text");
 
                     b.Property<decimal>("UnitCost")
-                        .HasColumnType("decimal(18,2)");
+                        .HasColumnType("decimal(18,4)");
 
                     b.HasKey("Id");
 

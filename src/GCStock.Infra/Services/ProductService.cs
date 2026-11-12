@@ -30,7 +30,9 @@ public class ProductService(GCStockDbContext db, ICurrentUserContext currentUser
                 if (request.Unit is not null) existing.Unit = request.Unit;
                 if (request.Stock is not null) existing.Stock = request.Stock.Value;
                 if (request.MinStock is not null) existing.MinStock = request.MinStock.Value;
+                var costBefore = CostHistory.Snapshot([existing]);
                 if (request.CostPrice is not null) existing.CostPrice = request.CostPrice.Value;
+                CostHistory.RecordChanges(db, currentUser.CompanyId, currentUser.UserName, costBefore, [existing], "ajuste_manual", null);
                 if (request.SellingPrice is not null) existing.SellingPrice = request.SellingPrice.Value;
                 if (request.IsPerishable is not null) existing.IsPerishable = request.IsPerishable.Value;
                 if (request.AlertDays is not null) existing.AlertDays = request.AlertDays.Value;
@@ -83,10 +85,23 @@ public class ProductService(GCStockDbContext db, ICurrentUserContext currentUser
             IsPromo = request.IsPromo ?? false,
         };
         db.Products.Add(saved);
+        // Custo informado no cadastro é o primeiro ponto do histórico (de zero para o custo inicial).
+        CostHistory.RecordChanges(
+            db, currentUser.CompanyId, currentUser.UserName, new Dictionary<Guid, decimal> { [saved.Id] = 0m }, [saved], "ajuste_manual", null);
         await db.SaveChangesAsync(ct);
         await categories.EnsureExistsAsync(saved.Category, ct);
         await audit.RecordAsync("criou", "Produto", saved.Name, null, ct);
         return ToDto(saved);
+    }
+
+    public async Task<List<ProductCostHistoryDto>> GetCostHistoryAsync(Guid productId, CancellationToken ct)
+    {
+        var rows = await db.ProductCostHistories
+            .Where(h => h.CompanyId == currentUser.CompanyId && h.ProductId == productId)
+            .OrderByDescending(h => h.CreatedAt)
+            .ToListAsync(ct);
+        return rows.Select(h => new ProductCostHistoryDto(
+            h.Id, h.PreviousCost, h.NewCost, h.Source, h.PurchaseCode, h.CreatedAt, h.CreatedBy)).ToList();
     }
 
     public async Task DeleteAsync(Guid id, CancellationToken ct)

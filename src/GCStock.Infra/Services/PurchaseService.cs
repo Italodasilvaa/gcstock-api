@@ -77,7 +77,13 @@ public class PurchaseService(GCStockDbContext db, ICurrentUserContext currentUse
         // Pix / Dinheiro / Cartão são pagos no ato: a compra e o título já nascem quitados.
         if (IsPaidOnEntry(saved.PaymentMode)) MarkAsPaid(saved, payable);
 
-        await ApplyItemsToStockAsync(saved, items, ct);
+        var saveProductIds = ProductIdsOf(items);
+        var saveProducts = saveProductIds.Count > 0
+            ? await db.Products.Where(p => p.CompanyId == currentUser.CompanyId && saveProductIds.Contains(p.Id)).ToDictionaryAsync(p => p.Id, ct)
+            : [];
+        var costsBefore = CostHistory.Snapshot(saveProducts.Values);
+        await ApplyItemsToStockAsync(saved, items, ct, saveProducts);
+        CostHistory.RecordChanges(db, currentUser.CompanyId, currentUser.UserName, costsBefore, saveProducts.Values, "compra", saved);
 
         await db.SaveChangesAsync(ct);
         await audit.RecordAsync("criou", "Compra / Entrada", $"{saved.OrderCode} • {saved.SupplierName}", null, ct);
@@ -149,6 +155,7 @@ public class PurchaseService(GCStockDbContext db, ICurrentUserContext currentUse
         var products = touchedProductIds.Count > 0
             ? await db.Products.Where(p => p.CompanyId == currentUser.CompanyId && touchedProductIds.Contains(p.Id)).ToDictionaryAsync(p => p.Id, ct)
             : [];
+        var costsBefore = CostHistory.Snapshot(products.Values);
 
         if (rebuildStock)
         {
@@ -202,6 +209,7 @@ public class PurchaseService(GCStockDbContext db, ICurrentUserContext currentUse
         if (rebuildStock)
         {
             await ApplyItemsToStockAsync(existing, newItems, ct, products, touchedProductIds);
+            CostHistory.RecordChanges(db, currentUser.CompanyId, currentUser.UserName, costsBefore, products.Values, "edicao_compra", existing);
         }
         else
         {
@@ -242,6 +250,7 @@ public class PurchaseService(GCStockDbContext db, ICurrentUserContext currentUse
         var products = productIds.Count > 0
             ? await db.Products.Where(p => p.CompanyId == currentUser.CompanyId && productIds.Contains(p.Id)).ToDictionaryAsync(p => p.Id, ct)
             : [];
+        var costsBefore = CostHistory.Snapshot(products.Values);
 
         // Falha aqui (InvalidOperationException) se parte do que entrou já foi vendida ou perdida: nada é gravado.
         await ReverseStockAsync(existing, existing.Items, products, $"Cancelamento: {cleanReason}", ct);
@@ -264,6 +273,7 @@ public class PurchaseService(GCStockDbContext db, ICurrentUserContext currentUse
 
         await db.SaveChangesAsync(ct);
         await RefreshProductsAfterReversalAsync(products.Values, ct);
+        CostHistory.RecordChanges(db, currentUser.CompanyId, currentUser.UserName, costsBefore, products.Values, "cancelamento_compra", existing);
         await db.SaveChangesAsync(ct);
 
         await audit.RecordAsync(
@@ -497,7 +507,7 @@ public class PurchaseService(GCStockDbContext db, ICurrentUserContext currentUse
             var remainingQty = remaining.Sum(b => b.AvailableKg);
             if (remainingQty > 0 && Math.Abs(remainingQty - product.Stock) < 0.001m)
             {
-                product.CostPrice = Math.Round(remaining.Sum(b => b.AvailableKg * b.UnitCost) / remainingQty, 2, MidpointRounding.AwayFromZero);
+                product.CostPrice = CostHistory.Round(remaining.Sum(b => b.AvailableKg * b.UnitCost) / remainingQty);
             }
         }
     }
@@ -609,7 +619,7 @@ public class PurchaseService(GCStockDbContext db, ICurrentUserContext currentUse
         var stockBefore = Math.Max(0, product.Stock);
         var total = stockBefore + quantity;
         product.CostPrice = total > 0
-            ? Math.Round((stockBefore * product.CostPrice + quantity * unitCost) / total, 2)
+            ? CostHistory.Round((stockBefore * product.CostPrice + quantity * unitCost) / total)
             : unitCost;
     }
 
@@ -623,7 +633,7 @@ public class PurchaseService(GCStockDbContext db, ICurrentUserContext currentUse
         if (product.Stock <= 0 || remaining <= 0) return;
 
         var value = product.Stock * product.CostPrice - quantity * unitCost;
-        product.CostPrice = Math.Round(Math.Max(0, value / remaining), 2);
+        product.CostPrice = CostHistory.Round(Math.Max(0, value / remaining));
     }
 
     private async Task ApplyItemsToStockAsync(
