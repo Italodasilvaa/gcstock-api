@@ -263,6 +263,7 @@ public class PosService(GCStockDbContext db, ICurrentUserContext currentUser, IA
                 "(preço ou taxa de pagamento atualizados). Atualize a tela e confira antes de finalizar.");
         }
         var installments = ValidInstallments(payment.Mode, request.Installments);
+        var creditException = await EnsureCreditAsync(request, payment.Mode, pricing.Total, ct);
 
         var saleItems = new List<SaleItem>();
 
@@ -416,15 +417,6 @@ public class PosService(GCStockDbContext db, ICurrentUserContext currentUser, IA
                     InstallmentCount = installments,
                 });
             }
-
-            if (request.ClientId.HasValue)
-            {
-                var client = await db.Clients.FirstOrDefaultAsync(c => c.Id == request.ClientId && c.CompanyId == currentUser.CompanyId, ct);
-                if (client is not null)
-                {
-                    client.TotalSpent += pricing.Total;
-                }
-            }
         }
 
         db.SaleRecords.Add(new SaleRecord
@@ -449,10 +441,46 @@ public class PosService(GCStockDbContext db, ICurrentUserContext currentUser, IA
         await audit.RecordAsync(
             "vendeu", "Venda PDV",
             $"{receiptNumber} • {pricing.Total.ToString("C", PtBr)}",
-            request.ClientName ?? payment.Mode, ct);
+            (request.ClientName ?? payment.Mode) + (creditException ? " • limite de crédito excedido (exceção autorizada)" : string.Empty), ct);
         await transaction.CommitAsync(ct);
 
         return new FinalizeSaleResult(saleId, receiptNumber, pricing.Total, pricing.Net, pricing.Fee, pricing.Discount, installments);
+    }
+
+    /// <summary>
+    /// Venda a prazo exige cliente e respeita o limite de crédito: o que ele já deve (títulos em aberto) mais esta venda não pode
+    /// passar do limite cadastrado (limite zero = não definido, sem bloqueio). Quem tem a permissão "vendas.exceder-limite" pode
+    /// autorizar a exceção, que fica registrada. Devolve true quando a venda passou por exceção.
+    /// </summary>
+    private async Task<bool> EnsureCreditAsync(FinalizeSaleRequest request, string mode, decimal total, CancellationToken ct)
+    {
+        if (mode != "a_prazo") return false;
+        if (!request.ClientId.HasValue) throw new ArgumentException("Selecione o cliente para registrar a venda a prazo.");
+
+        // Trava o cliente até o fim da transação: duas vendas a prazo ao mesmo tempo não estouram o limite juntas.
+        var clientId = request.ClientId.Value;
+        await db.Database.ExecuteSqlInterpolatedAsync(
+            $"SELECT 1 FROM \"Clients\" WHERE \"Id\" = {clientId} AND \"CompanyId\" = {currentUser.CompanyId} FOR UPDATE", ct);
+
+        var limit = await db.Clients
+            .Where(c => c.Id == clientId && c.CompanyId == currentUser.CompanyId)
+            .Select(c => c.CreditLimit)
+            .SingleAsync(ct);
+        var used = await db.AccountsReceivables
+            .Where(r => r.CompanyId == currentUser.CompanyId && r.ClientId == clientId && r.Status != "recebido")
+            .SumAsync(r => (decimal?)r.GrossAmount, ct) ?? 0m;
+
+        if (!ClientMetrics.ExceedsLimit(limit, used, total)) return false;
+
+        if (!await permissions.HasAsync(Permissions.SalesExceedCredit, ct))
+        {
+            throw new InvalidOperationException(
+                $"Limite de crédito excedido: limite {limit.ToString("C", PtBr)}, já em aberto {used.ToString("C", PtBr)}, " +
+                $"esta venda {total.ToString("C", PtBr)} (disponível {ClientMetrics.CreditAvailable(limit, used).ToString("C", PtBr)}). " +
+                "Peça a autorização de quem pode exceder o limite, ou receba parte do que o cliente já deve.");
+        }
+
+        return true;
     }
 
     /// <summary>VEN-{ano}-{sequência de 6 dígitos}, único por empresa (o lock da venda garante que ninguém pega o mesmo).</summary>

@@ -141,7 +141,9 @@ public class TenantIsolationTests(PostgresFixture fixture) : IClassFixture<Postg
         }
 
         await using var check = fixture.CreateContext();
-        Assert.Equal(10m, (await check.Clients.SingleAsync(c => c.Id == world.ClientA.Id)).TotalSpent);
+        var clientA = (await new ClientService(check, world.UserA, new AuditRecorder(check, world.UserA)).GetAllAsync(CancellationToken.None))
+            .Single(c => c.Id == world.ClientA.Id);
+        Assert.Equal(10m, clientA.TotalSpent);
         Assert.Equal(9m, (await check.Products.SingleAsync(p => p.Id == world.ProductA.Id)).Stock);
     }
 

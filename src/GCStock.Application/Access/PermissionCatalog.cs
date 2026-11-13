@@ -37,6 +37,8 @@ public static class Permissions
     public const string SalesEditPrice = "vendas.alterar-preco";
     /// <summary>Cancelar (estornar) uma venda já finalizada.</summary>
     public const string SalesCancel = "vendas.cancelar";
+    /// <summary>Vender a prazo acima do limite de crédito do cliente (validado no PosService, não por rota).</summary>
+    public const string SalesExceedCredit = "vendas.exceder-limite";
 
     // Clientes
     public const string ClientsCreate = "clientes.criar";
@@ -93,6 +95,7 @@ public static class Permissions
         new(SalesCreate, "Realizar vendas", "Finalizar vendas no PDV.", "Vendas (PDV)"),
         new(SalesCancel, "Cancelar vendas", "Cancelar (estornar) vendas já finalizadas e registrar devolução parcial de itens: devolve o estoque apto e ajusta o financeiro.", "Vendas (PDV)"),
         new(SalesEditPrice, "Alterar preço na venda", "Mudar o preço de um item no carrinho do PDV, vendendo por valor diferente do cadastro.", "Vendas (PDV)"),
+        new(SalesExceedCredit, "Exceder limite de crédito", "Autorizar uma venda a prazo que faz o saldo em aberto do cliente passar do limite de crédito dele. A exceção fica registrada.", "Vendas (PDV)"),
 
         new(ClientsCreate, "Cadastrar clientes", "Criar novos clientes.", "Clientes"),
         new(ClientsEdit, "Editar clientes", "Alterar dados e limite de crédito dos clientes.", "Clientes"),

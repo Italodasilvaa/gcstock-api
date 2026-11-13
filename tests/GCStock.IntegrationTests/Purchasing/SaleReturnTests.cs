@@ -200,7 +200,9 @@ public class SaleReturnTests(PostgresFixture fixture) : IClassFixture<PostgresFi
 
         var saleReturn = await check.SaleReturns.SingleAsync(r => r.SaleRecordId == check.SaleRecords.Single(s => s.SaleId == sale.SaleId).Id);
         Assert.Equal((100m, 100m, 0m), (saleReturn.RefundAmount, saleReturn.ReceivableAbated, saleReturn.CashRefundAmount));
-        Assert.Equal(200m, (await check.Clients.SingleAsync(c => c.Id == world.Client.Id)).TotalSpent);
+        var clientDto = (await new ClientService(check, world.User, new AuditRecorder(check, world.User)).GetAllAsync(CancellationToken.None))
+            .Single(c => c.Id == world.Client.Id);
+        Assert.Equal((200m, 200m), (clientDto.TotalSpent, clientDto.OpenBalance));
     }
 
     [DockerFact]

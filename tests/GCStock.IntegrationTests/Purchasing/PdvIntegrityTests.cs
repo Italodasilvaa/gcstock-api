@@ -191,7 +191,9 @@ public class PdvIntegrityTests(PostgresFixture fixture) : IClassFixture<Postgres
         Assert.Equal(4, parts.Count);
         Assert.Equal(200m, parts.Sum(p => p.GrossAmount));
         Assert.Equal(firstDue.AddMonths(3), parts[3].DueDate);
-        Assert.Equal(200m, (await check.Clients.SingleAsync(c => c.Id == world.Client.Id)).TotalSpent);
+        var clientDto = (await new ClientService(check, world.User, new AuditRecorder(check, world.User)).GetAllAsync(CancellationToken.None))
+            .Single(c => c.Id == world.Client.Id);
+        Assert.Equal((200m, 200m), (clientDto.TotalSpent, clientDto.OpenBalance));
     }
 
     [DockerFact]

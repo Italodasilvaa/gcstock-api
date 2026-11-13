@@ -146,12 +146,6 @@ public class SaleService(GCStockDbContext db, ICurrentUserContext currentUser, I
         // Desfaz o financeiro da venda.
         db.AccountsReceivables.RemoveRange(receivables);
 
-        if (sale.PaymentMode == "a_prazo" && sale.ClientId.HasValue)
-        {
-            var client = await db.Clients.FirstOrDefaultAsync(c => c.Id == sale.ClientId && c.CompanyId == currentUser.CompanyId, ct);
-            if (client is not null) client.TotalSpent = Math.Max(0, client.TotalSpent - sale.Total);
-        }
-
         sale.Status = "cancelada";
         sale.CanceledAt = now;
         sale.CanceledBy = currentUser.UserName;
@@ -297,12 +291,6 @@ public class SaleService(GCStockDbContext db, ICurrentUserContext currentUser, I
         }
         saleReturn.ReceivableAbated = totalRefund - toAbate;
         saleReturn.CashRefundAmount = toAbate;
-
-        if (sale.PaymentMode == "a_prazo" && sale.ClientId.HasValue)
-        {
-            var client = await db.Clients.FirstOrDefaultAsync(c => c.Id == sale.ClientId && c.CompanyId == currentUser.CompanyId, ct);
-            if (client is not null) client.TotalSpent = Math.Max(0, client.TotalSpent - totalRefund);
-        }
 
         db.SaleReturns.Add(saleReturn);
         await db.SaveChangesAsync(ct);

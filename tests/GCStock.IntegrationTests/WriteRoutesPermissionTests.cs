@@ -31,7 +31,7 @@ public class WriteRoutesPermissionTests(WebApplicationFactory<Program> factory)
     ];
 
     /// <summary>Permissões validadas dentro de um serviço (dependem do conteúdo da requisição), não por rota.</summary>
-    private static readonly string[] ServiceEnforced = [Permissions.SalesEditPrice];
+    private static readonly string[] ServiceEnforced = [Permissions.SalesEditPrice, Permissions.SalesExceedCredit];
 
     [Fact]
     public void Every_Write_Route_Requires_A_Catalog_Permission_Or_Is_A_Known_Exception()
