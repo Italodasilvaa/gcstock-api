@@ -6,7 +6,9 @@ public record GlobalAlertSettingDto(
     bool NotifyTopbar,
     bool NotifyEmail,
     bool NotifyWhatsapp,
-    List<string> Recipients);
+    List<string> Recipients,
+    /// <summary>Margem mínima padrão (%) dos kits da empresa; cada kit pode ter a sua.</summary>
+    decimal MinKitMarginPercent = 30m);
 
 public interface IAlertSettingService
 {

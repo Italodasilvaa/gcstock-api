@@ -78,6 +78,9 @@ public static class CatalogEndpoints
         kits.MapGet("/", async (IKitService service, CancellationToken ct) =>
             Results.Ok(await service.GetAllAsync(ct)));
 
+        kits.MapGet("/{id:guid}/historico-custo", async (Guid id, IKitService service, CancellationToken ct) =>
+            Results.Ok(await service.GetCostHistoryAsync(id, ct)));
+
         kits.MapPost("/", async (SaveKitRequest request, IKitService service, CancellationToken ct) =>
         {
             try

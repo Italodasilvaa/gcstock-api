@@ -26,6 +26,7 @@ public class GCStockDbContext(DbContextOptions<GCStockDbContext> options) : DbCo
     public DbSet<PurchaseItem> PurchaseItems => Set<PurchaseItem>();
     public DbSet<PurchaseRefund> PurchaseRefunds => Set<PurchaseRefund>();
     public DbSet<ProductCostHistory> ProductCostHistories => Set<ProductCostHistory>();
+    public DbSet<KitCostHistory> KitCostHistories => Set<KitCostHistory>();
 
     public DbSet<AccountsPayable> AccountsPayables => Set<AccountsPayable>();
     public DbSet<CapitalContribution> CapitalContributions => Set<CapitalContribution>();
@@ -118,6 +119,7 @@ public class GCStockDbContext(DbContextOptions<GCStockDbContext> options) : DbCo
             e.Property(x => x.SuggestedPrice).HasColumnType(moneyType);
             e.Property(x => x.CostPrice).HasColumnType(moneyType);
             e.Property(x => x.MarginPercent).HasColumnType(percentType);
+            e.Property(x => x.MinMarginPercent).HasColumnType(percentType);
             e.Property(x => x.TotalWeightKg).HasColumnType(qtyType);
             e.Property(x => x.StockAvailable).HasColumnType(qtyType);
         });
@@ -198,6 +200,17 @@ public class GCStockDbContext(DbContextOptions<GCStockDbContext> options) : DbCo
             e.Property(x => x.Amount).HasColumnType(moneyType);
         });
 
+        modelBuilder.Entity<KitCostHistory>(e =>
+        {
+            e.HasKey(x => x.Id);
+            e.HasIndex(x => new { x.CompanyId, x.KitId, x.CreatedAt });
+            e.Property(x => x.PreviousCost).HasColumnType(moneyType);
+            e.Property(x => x.NewCost).HasColumnType(moneyType);
+            e.Property(x => x.SuggestedPrice).HasColumnType(moneyType);
+            e.Property(x => x.PreviousMarginPercent).HasColumnType(percentType);
+            e.Property(x => x.NewMarginPercent).HasColumnType(percentType);
+        });
+
         modelBuilder.Entity<ProductCostHistory>(e =>
         {
             e.HasKey(x => x.Id);
@@ -255,6 +268,7 @@ public class GCStockDbContext(DbContextOptions<GCStockDbContext> options) : DbCo
         modelBuilder.Entity<AlertSetting>(e =>
         {
             e.HasKey(x => x.CompanyId);
+            e.Property(x => x.MinKitMarginPercent).HasColumnType(percentType).HasDefaultValue(30m);
             e.HasOne(x => x.Company).WithMany().HasForeignKey(x => x.CompanyId).OnDelete(DeleteBehavior.Cascade);
             e.Property(x => x.Recipients)
                 .HasConversion(

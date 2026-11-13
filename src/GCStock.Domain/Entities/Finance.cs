@@ -117,6 +117,9 @@ public class AlertSetting
     public bool NotifyEmail { get; set; } = true;
     public bool NotifyWhatsapp { get; set; } = true;
 
+    /// <summary>Margem mínima padrão (%) dos kits da empresa: abaixo disso o kit é sinalizado. Cada kit pode ter a sua.</summary>
+    public decimal MinKitMarginPercent { get; set; } = 30m;
+
     /// <summary>Lista de destinatários serializada com '|' como separador (ver GCStockDbContext).</summary>
     public List<string> Recipients { get; set; } = [];
 }

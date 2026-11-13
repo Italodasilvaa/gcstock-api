@@ -64,6 +64,9 @@ public class Kit
     public string StockStatus { get; set; } = "disponivel";
     public string BarcodeEan { get; set; } = string.Empty;
 
+    /// <summary>Margem mínima deste kit (%). Nulo = usa a margem mínima padrão da empresa (AlertSetting.MinKitMarginPercent).</summary>
+    public decimal? MinMarginPercent { get; set; }
+
     public List<KitComponent> Components { get; set; } = [];
 }
 

@@ -190,6 +190,11 @@ namespace GCStock.Infra.Database.Migrations
                     b.Property<int>("AlertLeadDays")
                         .HasColumnType("integer");
 
+                    b.Property<decimal>("MinKitMarginPercent")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("decimal(9,4)")
+                        .HasDefaultValue(30m);
+
                     b.Property<string>("MorningSummaryTime")
                         .IsRequired()
                         .HasColumnType("text");
@@ -573,6 +578,9 @@ namespace GCStock.Infra.Database.Migrations
                     b.Property<decimal>("MarginPercent")
                         .HasColumnType("decimal(9,4)");
 
+                    b.Property<decimal?>("MinMarginPercent")
+                        .HasColumnType("decimal(9,4)");
+
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasColumnType("text");
@@ -650,6 +658,58 @@ namespace GCStock.Infra.Database.Migrations
                     b.HasIndex("KitId");
 
                     b.ToTable("KitComponents");
+                });
+
+            modelBuilder.Entity("GCStock.Domain.Entities.KitCostHistory", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("CompanyId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("CreatedBy")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<Guid>("KitId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("KitName")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<decimal>("NewCost")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<decimal>("NewMarginPercent")
+                        .HasColumnType("decimal(9,4)");
+
+                    b.Property<decimal>("PreviousCost")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<decimal>("PreviousMarginPercent")
+                        .HasColumnType("decimal(9,4)");
+
+                    b.Property<string>("Source")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<decimal>("SuggestedPrice")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<string>("TriggerProduct")
+                        .HasColumnType("text");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CompanyId", "KitId", "CreatedAt");
+
+                    b.ToTable("KitCostHistories");
                 });
 
             modelBuilder.Entity("GCStock.Domain.Entities.PaymentFeeSetting", b =>

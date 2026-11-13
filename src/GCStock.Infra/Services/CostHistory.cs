@@ -17,13 +17,16 @@ internal static class CostHistory
     public static Dictionary<Guid, decimal> Snapshot(IEnumerable<Product> products) =>
         products.ToDictionary(p => p.Id, p => p.CostPrice);
 
-    public static void RecordChanges(
+    /// <summary>Grava uma linha de histórico por produto cujo custo mudou e devolve esses produtos (para recalcular os kits deles).</summary>
+    public static List<Product> RecordChanges(
         GCStockDbContext db, Guid companyId, string createdBy, Dictionary<Guid, decimal> before,
         IEnumerable<Product> products, string source, PurchaseEntry? purchase)
     {
+        var changed = new List<Product>();
         foreach (var product in products)
         {
             if (!before.TryGetValue(product.Id, out var previous) || previous == product.CostPrice) continue;
+            changed.Add(product);
 
             db.ProductCostHistories.Add(new ProductCostHistory
             {
@@ -38,5 +41,7 @@ internal static class CostHistory
                 CreatedBy = createdBy,
             });
         }
+
+        return changed;
     }
 }

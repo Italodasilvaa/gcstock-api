@@ -32,7 +32,10 @@ public class ProductService(GCStockDbContext db, ICurrentUserContext currentUser
                 if (request.MinStock is not null) existing.MinStock = request.MinStock.Value;
                 var costBefore = CostHistory.Snapshot([existing]);
                 if (request.CostPrice is not null) existing.CostPrice = request.CostPrice.Value;
-                CostHistory.RecordChanges(db, currentUser.CompanyId, currentUser.UserName, costBefore, [existing], "ajuste_manual", null);
+                // Custo mudou à mão: os kits que usam o produto são recalculados na mesma gravação.
+                await KitCostRecalculator.RecalculateForProductsAsync(
+                    db, currentUser.CompanyId, currentUser.UserName,
+                    CostHistory.RecordChanges(db, currentUser.CompanyId, currentUser.UserName, costBefore, [existing], "ajuste_manual", null), ct);
                 if (request.SellingPrice is not null) existing.SellingPrice = request.SellingPrice.Value;
                 if (request.IsPerishable is not null) existing.IsPerishable = request.IsPerishable.Value;
                 if (request.AlertDays is not null) existing.AlertDays = request.AlertDays.Value;

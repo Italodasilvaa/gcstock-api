@@ -39,8 +39,15 @@ public static class ConfiguracoesEndpoints
 
         group.MapPut("/alertas-sanitarios", async (GlobalAlertSettingDto request, IAlertSettingService service, CancellationToken ct) =>
         {
-            await service.UpdateAsync(request, ct);
-            return Results.Ok();
+            try
+            {
+                await service.UpdateAsync(request, ct);
+                return Results.Ok();
+            }
+            catch (ArgumentException ex)
+            {
+                return Results.BadRequest(new { message = ex.Message });
+            }
         }).RequireAuthorization(Permissions.AlertsEdit);
     }
 }

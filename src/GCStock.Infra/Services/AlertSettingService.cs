@@ -31,11 +31,16 @@ public class AlertSettingService(GCStockDbContext db, ICurrentUserContext curren
         settings.NotifyEmail = request.NotifyEmail;
         settings.NotifyWhatsapp = request.NotifyWhatsapp;
         settings.Recipients = request.Recipients;
+        if (request.MinKitMarginPercent < 0 || request.MinKitMarginPercent >= 100)
+        {
+            throw new ArgumentException("A margem mínima dos kits deve ficar entre 0 e 99,99%.");
+        }
+        settings.MinKitMarginPercent = Math.Round(request.MinKitMarginPercent, 2, MidpointRounding.AwayFromZero);
 
         await db.SaveChangesAsync(ct);
         await audit.RecordAsync("editou", "Alertas Sanitários", "Configuração de alertas de validade", null, ct);
     }
 
     private static GlobalAlertSettingDto ToDto(AlertSetting a) => new(
-        a.AlertLeadDays, a.MorningSummaryTime, a.NotifyTopbar, a.NotifyEmail, a.NotifyWhatsapp, a.Recipients);
+        a.AlertLeadDays, a.MorningSummaryTime, a.NotifyTopbar, a.NotifyEmail, a.NotifyWhatsapp, a.Recipients, a.MinKitMarginPercent);
 }

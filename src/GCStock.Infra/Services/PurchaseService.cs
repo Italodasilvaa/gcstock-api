@@ -83,7 +83,9 @@ public class PurchaseService(GCStockDbContext db, ICurrentUserContext currentUse
             : [];
         var costsBefore = CostHistory.Snapshot(saveProducts.Values);
         await ApplyItemsToStockAsync(saved, items, ct, saveProducts);
-        CostHistory.RecordChanges(db, currentUser.CompanyId, currentUser.UserName, costsBefore, saveProducts.Values, "compra", saved);
+        await KitCostRecalculator.RecalculateForProductsAsync(
+            db, currentUser.CompanyId, currentUser.UserName,
+            CostHistory.RecordChanges(db, currentUser.CompanyId, currentUser.UserName, costsBefore, saveProducts.Values, "compra", saved), ct);
 
         await db.SaveChangesAsync(ct);
         await audit.RecordAsync("criou", "Compra / Entrada", $"{saved.OrderCode} • {saved.SupplierName}", null, ct);
@@ -209,7 +211,9 @@ public class PurchaseService(GCStockDbContext db, ICurrentUserContext currentUse
         if (rebuildStock)
         {
             await ApplyItemsToStockAsync(existing, newItems, ct, products, touchedProductIds);
-            CostHistory.RecordChanges(db, currentUser.CompanyId, currentUser.UserName, costsBefore, products.Values, "edicao_compra", existing);
+            await KitCostRecalculator.RecalculateForProductsAsync(
+                db, currentUser.CompanyId, currentUser.UserName,
+                CostHistory.RecordChanges(db, currentUser.CompanyId, currentUser.UserName, costsBefore, products.Values, "edicao_compra", existing), ct);
         }
         else
         {
@@ -273,7 +277,9 @@ public class PurchaseService(GCStockDbContext db, ICurrentUserContext currentUse
 
         await db.SaveChangesAsync(ct);
         await RefreshProductsAfterReversalAsync(products.Values, ct);
-        CostHistory.RecordChanges(db, currentUser.CompanyId, currentUser.UserName, costsBefore, products.Values, "cancelamento_compra", existing);
+        await KitCostRecalculator.RecalculateForProductsAsync(
+            db, currentUser.CompanyId, currentUser.UserName,
+            CostHistory.RecordChanges(db, currentUser.CompanyId, currentUser.UserName, costsBefore, products.Values, "cancelamento_compra", existing), ct);
         await db.SaveChangesAsync(ct);
 
         await audit.RecordAsync(
