@@ -69,6 +69,8 @@ public class InventoryService(GCStockDbContext db, ICurrentUserContext currentUs
         return await db.StockMovements
             .Where(m => m.CompanyId == currentUser.CompanyId)
             .OrderByDescending(m => m.Timestamp)
+            // Histórico cresce a cada venda e compra: devolve as mais recentes (as telas só exibem o recente).
+            .Take(2000)
             .Select(m => new StockMovementDto(
                 m.Id, m.Timestamp, m.Type, m.Title, m.DocInfo, m.AmountKg, m.Description, m.BadgeLabel, m.AuditLink, m.Unit))
             .ToListAsync(ct);

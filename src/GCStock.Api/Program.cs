@@ -2,6 +2,7 @@ using System.Text;
 using GCStock.Api.Authorization;
 using GCStock.Api.Cors;
 using GCStock.Api.Endpoints;
+using GCStock.Api.Errors;
 using GCStock.Api.HealthChecks;
 using GCStock.Application.Abstractions;
 using GCStock.Application.Access;
@@ -21,6 +22,19 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Configuration.AddKeyPerFile("/run/secrets", optional: true);
 
 builder.Services.AddInfra(builder.Configuration);
+
+// Logs estruturados (JSON, uma linha por evento, com TraceId/CompanyId/UserId) fora do desenvolvimento, para busca em produção;
+// em desenvolvimento fica o console legível de sempre.
+if (!builder.Environment.IsDevelopment())
+{
+    builder.Logging.ClearProviders();
+    builder.Logging.AddJsonConsole(options =>
+    {
+        options.IncludeScopes = true;
+        options.UseUtcTimestamp = true;
+        options.TimestampFormat = "yyyy-MM-ddTHH:mm:ss.fffZ ";
+    });
+}
 
 var jwtSettings = builder.Configuration.GetSection(JwtSettings.SectionName).Get<JwtSettings>() ?? new JwtSettings();
 if (string.IsNullOrWhiteSpace(jwtSettings.SecretKey) || jwtSettings.SecretKey.Length < 32)
@@ -132,6 +146,9 @@ if (app.Environment.IsDevelopment())
 
 app.UseCors(CorsPolicyExtensions.PolicyName);
 
+// Depois do CORS (a resposta de erro também precisa dos cabeçalhos): erro que escapa de uma rota vira JSON { message, traceId }.
+app.UseApiErrorHandling();
+
 // Em desenvolvimento local, evita o redirecionamento para a porta HTTPS (launchSettings expõe
 // http+https juntos): o front-end costuma fixar a URL da API em http://localhost:5105, e o
 // redirect para https://localhost:7133 quebra o preflight de CORS quando o certificado dev
@@ -143,6 +160,9 @@ if (!app.Environment.IsDevelopment())
 
 app.UseAuthentication();
 app.UseAuthorization();
+
+// Limite do corpo das requisições e empresa/usuário/trace em todos os logs da requisição.
+app.UseRequestContext();
 
 app.MapHealthChecks("/health/live", new HealthCheckOptions
 {

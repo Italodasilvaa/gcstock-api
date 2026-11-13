@@ -47,7 +47,11 @@ public class ProductService(GCStockDbContext db, ICurrentUserContext currentUser
             var existing = await db.Products.FirstOrDefaultAsync(p => p.Id == request.Id && p.CompanyId == currentUser.CompanyId, ct);
             if (existing is not null)
             {
-                if (request.Sku is not null) existing.Sku = request.Sku;
+                if (request.Sku is not null && request.Sku != existing.Sku)
+                {
+                    await EnsureSkuAvailableAsync(request.Sku, existing.Id, ct);
+                    existing.Sku = request.Sku;
+                }
                 if (request.Name is not null) existing.Name = request.Name;
                 if (request.Category is not null) existing.Category = request.Category;
                 if (request.Unit is not null) existing.Unit = request.Unit;
@@ -83,6 +87,8 @@ public class ProductService(GCStockDbContext db, ICurrentUserContext currentUser
                 return ToDto(existing);
             }
         }
+
+        if (!string.IsNullOrWhiteSpace(request.Sku)) await EnsureSkuAvailableAsync(request.Sku, null, ct);
 
         var rnd = Random.Shared;
         var skuSeed = "CAR-" + rnd.Next(100, 1000);
@@ -144,6 +150,20 @@ public class ProductService(GCStockDbContext db, ICurrentUserContext currentUser
         db.Products.Remove(target);
         await db.SaveChangesAsync(ct);
         await audit.RecordAsync("excluiu", "Produto", target.Name, null, ct);
+    }
+
+    /// <summary>SKU único por empresa (sem diferenciar maiúsculas). Produtos antigos que já repetem SKU continuam como estão até serem editados.</summary>
+    private async Task EnsureSkuAvailableAsync(string sku, Guid? ignoreId, CancellationToken ct)
+    {
+        var normalized = sku.Trim().ToLower();
+        var taken = await db.Products
+            .Where(p => p.CompanyId == currentUser.CompanyId && (ignoreId == null || p.Id != ignoreId) && p.Sku.ToLower() == normalized)
+            .Select(p => p.Name)
+            .FirstOrDefaultAsync(ct);
+        if (taken is not null)
+        {
+            throw new ArgumentException($"O SKU \"{sku.Trim()}\" já é usado pelo produto \"{taken}\". Use um SKU diferente.");
+        }
     }
 
     /// <summary>Movimentação "ajuste_estoque" quando o saldo do produto é digitado à mão (cadastro ou edição).</summary>

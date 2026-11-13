@@ -94,6 +94,7 @@ public class GCStockDbContext(DbContextOptions<GCStockDbContext> options) : DbCo
 
         modelBuilder.Entity<Product>(e =>
         {
+            e.HasIndex(x => new { x.CompanyId, x.Sku });
             e.HasKey(x => x.Id);
             e.HasOne(x => x.Company).WithMany().HasForeignKey(x => x.CompanyId).OnDelete(DeleteBehavior.Cascade);
             e.HasIndex(x => x.CompanyId);
@@ -137,6 +138,7 @@ public class GCStockDbContext(DbContextOptions<GCStockDbContext> options) : DbCo
 
         modelBuilder.Entity<StockBatch>(e =>
         {
+            e.HasIndex(x => new { x.CompanyId, x.ProductId });
             e.HasKey(x => x.Id);
             e.HasOne(x => x.Company).WithMany().HasForeignKey(x => x.CompanyId).OnDelete(DeleteBehavior.Cascade);
             e.HasIndex(x => x.CompanyId);
@@ -146,6 +148,7 @@ public class GCStockDbContext(DbContextOptions<GCStockDbContext> options) : DbCo
 
         modelBuilder.Entity<StockMovement>(e =>
         {
+            e.HasIndex(x => new { x.CompanyId, x.Timestamp });
             e.HasKey(x => x.Id);
             e.HasOne(x => x.Company).WithMany().HasForeignKey(x => x.CompanyId).OnDelete(DeleteBehavior.Cascade);
             e.HasIndex(x => x.CompanyId);
@@ -181,6 +184,7 @@ public class GCStockDbContext(DbContextOptions<GCStockDbContext> options) : DbCo
 
         modelBuilder.Entity<PurchaseEntry>(e =>
         {
+            e.HasIndex(x => new { x.CompanyId, x.EntryDate });
             e.HasKey(x => x.Id);
             e.HasOne(x => x.Company).WithMany().HasForeignKey(x => x.CompanyId).OnDelete(DeleteBehavior.Cascade);
             e.HasIndex(x => x.CompanyId);
@@ -252,6 +256,7 @@ public class GCStockDbContext(DbContextOptions<GCStockDbContext> options) : DbCo
 
         modelBuilder.Entity<AccountsPayable>(e =>
         {
+            e.HasIndex(x => new { x.CompanyId, x.Status });
             e.HasKey(x => x.Id);
             e.HasOne(x => x.Company).WithMany().HasForeignKey(x => x.CompanyId).OnDelete(DeleteBehavior.Cascade);
             e.HasIndex(x => x.CompanyId);
@@ -260,6 +265,7 @@ public class GCStockDbContext(DbContextOptions<GCStockDbContext> options) : DbCo
 
         modelBuilder.Entity<AccountsReceivable>(e =>
         {
+            e.HasIndex(x => new { x.CompanyId, x.Status });
             e.HasKey(x => x.Id);
             e.HasOne(x => x.Company).WithMany().HasForeignKey(x => x.CompanyId).OnDelete(DeleteBehavior.Cascade);
             e.HasIndex(x => x.CompanyId);
@@ -322,6 +328,10 @@ public class GCStockDbContext(DbContextOptions<GCStockDbContext> options) : DbCo
 
         modelBuilder.Entity<SaleRecord>(e =>
         {
+            // Consultas por período (histórico, caixa, DRE, painel) e número da venda único por empresa (só os gerados pelo sistema, VEN-...;
+            // os antigos eram aleatórios e podem se repetir).
+            e.HasIndex(x => new { x.CompanyId, x.Timestamp });
+            e.HasIndex(x => new { x.CompanyId, x.ReceiptNumber }).IsUnique().HasFilter("\"ReceiptNumber\" LIKE 'VEN-%'");
             e.HasKey(x => x.Id);
             e.HasOne(x => x.Company).WithMany().HasForeignKey(x => x.CompanyId).OnDelete(DeleteBehavior.Cascade);
             e.HasIndex(x => x.CompanyId);
@@ -355,6 +365,7 @@ public class GCStockDbContext(DbContextOptions<GCStockDbContext> options) : DbCo
 
         modelBuilder.Entity<AuditLogEntry>(e =>
         {
+            e.HasIndex(x => new { x.CompanyId, x.Timestamp });
             e.HasKey(x => x.Id);
             e.HasOne(x => x.Company).WithMany().HasForeignKey(x => x.CompanyId).OnDelete(DeleteBehavior.Cascade);
             e.HasIndex(x => x.CompanyId);

@@ -86,6 +86,8 @@ namespace GCStock.Infra.Database.Migrations
 
                     b.HasIndex("CompanyId");
 
+                    b.HasIndex("CompanyId", "Status");
+
                     b.ToTable("AccountsPayables");
                 });
 
@@ -173,6 +175,8 @@ namespace GCStock.Infra.Database.Migrations
                     b.HasIndex("CompanyId");
 
                     b.HasIndex("CompanyId", "SaleId");
+
+                    b.HasIndex("CompanyId", "Status");
 
                     b.ToTable("AccountsReceivables");
                 });
@@ -289,6 +293,8 @@ namespace GCStock.Infra.Database.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("CompanyId");
+
+                    b.HasIndex("CompanyId", "Timestamp");
 
                     b.ToTable("AuditLogEntries");
                 });
@@ -883,6 +889,8 @@ namespace GCStock.Infra.Database.Migrations
 
                     b.HasIndex("CompanyId");
 
+                    b.HasIndex("CompanyId", "Sku");
+
                     b.ToTable("Products");
                 });
 
@@ -1047,6 +1055,8 @@ namespace GCStock.Infra.Database.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("CompanyId");
+
+                    b.HasIndex("CompanyId", "EntryDate");
 
                     b.HasIndex("CompanyId", "NfeNumber");
 
@@ -1286,6 +1296,12 @@ namespace GCStock.Infra.Database.Migrations
 
                     b.HasIndex("SaleId");
 
+                    b.HasIndex("CompanyId", "ReceiptNumber")
+                        .IsUnique()
+                        .HasFilter("\"ReceiptNumber\" LIKE 'VEN-%'");
+
+                    b.HasIndex("CompanyId", "Timestamp");
+
                     b.ToTable("SaleRecords");
                 });
 
@@ -1443,6 +1459,8 @@ namespace GCStock.Infra.Database.Migrations
 
                     b.HasIndex("CompanyId");
 
+                    b.HasIndex("CompanyId", "ProductId");
+
                     b.ToTable("StockBatches");
                 });
 
@@ -1590,6 +1608,8 @@ namespace GCStock.Infra.Database.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("CompanyId");
+
+                    b.HasIndex("CompanyId", "Timestamp");
 
                     b.ToTable("StockMovements");
                 });
