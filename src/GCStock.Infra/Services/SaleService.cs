@@ -111,7 +111,7 @@ public class SaleService(GCStockDbContext db, ICurrentUserContext currentUser, I
             {
                 CompanyId = currentUser.CompanyId,
                 Timestamp = now,
-                Type = "entrada",
+                Type = "estorno_venda",
                 Title = $"Venda cancelada {sale.ReceiptNumber}: {item.Name}",
                 DocInfo = $"Estorno da venda {sale.ReceiptNumber}",
                 AmountKg = item.Qty,

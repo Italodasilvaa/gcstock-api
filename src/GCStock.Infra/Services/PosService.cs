@@ -5,6 +5,7 @@ using GCStock.Application.Access;
 using GCStock.Application.Common;
 using GCStock.Application.Pdv;
 using GCStock.Domain.Entities;
+using GCStock.Domain.Services;
 using GCStock.Infra.Database;
 using Microsoft.EntityFrameworkCore;
 
@@ -66,20 +67,7 @@ public class PosService(GCStockDbContext db, ICurrentUserContext currentUser, IA
     /// </summary>
     private static void EnsureStockAvailable(FinalizeSaleRequest request, Dictionary<Guid, Product> products, Dictionary<Guid, Kit> kits)
     {
-        var required = new Dictionary<Guid, decimal>();
-        void Add(Guid productId, decimal qty) => required[productId] = required.GetValueOrDefault(productId) + qty;
-
-        foreach (var item in request.Items)
-        {
-            if (item.ProductId.HasValue && products.ContainsKey(item.ProductId.Value))
-            {
-                Add(item.ProductId.Value, item.Qty);
-            }
-            else if (item.KitId.HasValue && kits.TryGetValue(item.KitId.Value, out var kit))
-            {
-                foreach (var component in kit.Components) Add(component.ProductId, component.Quantity * item.Qty);
-            }
-        }
+        var required = RequiredByProduct(request, products, kits);
 
         var shortages = required
             .Where(r => products.TryGetValue(r.Key, out var p) && r.Value > p.Stock)
@@ -98,7 +86,68 @@ public class PosService(GCStockDbContext db, ICurrentUserContext currentUser, IA
         static string Format(decimal value) => value.ToString("0.###", PtBr);
     }
 
-    /// <summary>Consome os lotes do produto (pedido mais antigo primeiro) e guarda de onde saiu, para devolver no cancelamento.</summary>
+    /// <summary>Quanto de cada produto a venda precisa: itens avulsos + componentes dos kits vendidos.</summary>
+    private static Dictionary<Guid, decimal> RequiredByProduct(
+        FinalizeSaleRequest request, Dictionary<Guid, Product> products, Dictionary<Guid, Kit> kits)
+    {
+        var required = new Dictionary<Guid, decimal>();
+        void Add(Guid productId, decimal qty) => required[productId] = required.GetValueOrDefault(productId) + qty;
+
+        foreach (var item in request.Items)
+        {
+            if (item.ProductId.HasValue && products.ContainsKey(item.ProductId.Value))
+            {
+                Add(item.ProductId.Value, item.Qty);
+            }
+            else if (item.KitId.HasValue && kits.TryGetValue(item.KitId.Value, out var kit))
+            {
+                foreach (var component in kit.Components) Add(component.ProductId, component.Quantity * item.Qty);
+            }
+        }
+
+        return required;
+    }
+
+    /// <summary>
+    /// Produto vencido não pode ser vendido: a parte do estoque que está em lotes vencidos não conta como vendável.
+    /// Recusa se o que a venda pede passa do estoque válido (estoque total menos o vencido).
+    /// </summary>
+    private async Task EnsureNotExpiredAsync(
+        FinalizeSaleRequest request, Dictionary<Guid, Product> products, Dictionary<Guid, Kit> kits, CancellationToken ct)
+    {
+        var required = RequiredByProduct(request, products, kits);
+        if (required.Count == 0) return;
+
+        var today = ExpiryRules.Today(DateTime.UtcNow);
+        var ids = required.Keys.ToList();
+        var expiredLots = await db.StockBatches
+            .Where(b => b.CompanyId == currentUser.CompanyId && ids.Contains(b.ProductId) && b.AvailableKg > 0 && b.ExpiryDate < today)
+            .ToListAsync(ct);
+
+        var problems = new List<string>();
+        foreach (var group in expiredLots.GroupBy(b => b.ProductId))
+        {
+            if (!products.TryGetValue(group.Key, out var product)) continue;
+
+            var expiredQty = group.Sum(b => b.AvailableKg);
+            var sellable = Math.Max(0, product.Stock - expiredQty);
+            if (required[group.Key] > sellable + 0.0005m)
+            {
+                var lots = string.Join(", ", group.Select(b => string.IsNullOrWhiteSpace(b.LotNumber) ? "sem número" : b.LotNumber));
+                problems.Add(
+                    $"{product.Name}: {expiredQty.ToString("0.###", PtBr)} {product.Unit} vencido(s) (lote {lots}); " +
+                    $"vendável {sellable.ToString("0.###", PtBr)} {product.Unit}, pedido {required[group.Key].ToString("0.###", PtBr)} {product.Unit}");
+            }
+        }
+
+        if (problems.Count > 0)
+        {
+            throw new InvalidOperationException(
+                "Produto vencido não pode ser vendido: " + string.Join("; ", problems) + ". Registre a perda do lote vencido em Perdas.");
+        }
+    }
+
+    /// <summary>Consome os lotes do produto (FEFO: vence antes, sai antes; vencido nunca sai) e guarda de onde saiu, para devolver no cancelamento.</summary>
     private async Task ConsumeLotsAsync(SaleItem saleItem, Guid productId, decimal quantity, CancellationToken ct)
     {
         foreach (var (lotId, qty) in await StockLots.ConsumeAsync(db, currentUser.CompanyId, productId, quantity, ct))
@@ -126,11 +175,18 @@ public class PosService(GCStockDbContext db, ICurrentUserContext currentUser, IA
             .Where(b => b.CompanyId == currentUser.CompanyId && ids.Contains(b.Id))
             .ToDictionaryAsync(b => b.Id, ct);
 
+        var today = ExpiryRules.Today(DateTime.UtcNow);
         foreach (var item in chosen)
         {
             if (!lots.TryGetValue(item.StockBatchId!.Value, out var lot) || lot.ProductId != item.ProductId)
             {
                 throw new ArgumentException($"O lote escolhido para {item.Name} não existe ou não é desse produto.");
+            }
+
+            if (ExpiryRules.IsExpired(lot.ExpiryDate, today))
+            {
+                throw new InvalidOperationException(
+                    $"O lote {lot.LotNumber} de {item.Name} está vencido ({lot.ExpiryDate:dd/MM/yyyy}) e não pode ser vendido.");
             }
         }
 
@@ -189,6 +245,7 @@ public class PosService(GCStockDbContext db, ICurrentUserContext currentUser, IA
         await EnsureReferencesBelongToCompanyAsync(request, products, kits, ct);
         await EnsurePricesAllowedAsync(request, products, kits, ct);
         EnsureStockAvailable(request, products, kits);
+        await EnsureNotExpiredAsync(request, products, kits, ct);
         var chosenLots = await LoadChosenLotsAsync(request, products, ct);
 
         var saleItems = new List<SaleItem>();

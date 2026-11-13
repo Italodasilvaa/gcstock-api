@@ -27,7 +27,7 @@ public class StockBatch
     public Guid? PurchaseEntryId { get; set; }
 }
 
-/// <summary>Type: "entrada" | "baixa_pdv" | "perda_quebra".</summary>
+/// <summary>Type: "entrada" | "baixa_pdv" | "perda_quebra" | "estorno_compra" | "estorno_venda" | "estorno_perda" | "ajuste_estoque".</summary>
 public class StockMovement
 {
     public Guid Id { get; set; } = Guid.CreateVersion7();

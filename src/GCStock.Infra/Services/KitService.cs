@@ -20,7 +20,13 @@ public class KitService(GCStockDbContext db, ICurrentUserContext currentUser, IA
             .Where(k => k.CompanyId == currentUser.CompanyId)
             .ToListAsync(ct);
         var companyMin = await CompanyMinMarginAsync(ct);
-        return kits.Select(k => ToDto(k, companyMin)).ToList();
+
+        // Disponibilidade vem do estoque dos componentes (quantos kits dá para montar), não de um número guardado no kit.
+        var componentIds = kits.SelectMany(k => k.Components.Select(c => c.ProductId)).Distinct().ToList();
+        var products = componentIds.Count > 0
+            ? await db.Products.Where(p => p.CompanyId == currentUser.CompanyId && componentIds.Contains(p.Id)).ToDictionaryAsync(p => p.Id, ct)
+            : [];
+        return kits.Select(k => ToDto(k, companyMin, products)).ToList();
     }
 
     public async Task<KitDto> SaveAsync(SaveKitRequest request, CancellationToken ct)
@@ -88,7 +94,7 @@ public class KitService(GCStockDbContext db, ICurrentUserContext currentUser, IA
 
                 await db.SaveChangesAsync(ct);
                 await audit.RecordAsync("editou", "Kit de Churrasco", existing.Name, null, ct);
-                return ToDto(existing, await CompanyMinMarginAsync(ct));
+                return ToDto(existing, await CompanyMinMarginAsync(ct), products);
             }
         }
 
@@ -117,7 +123,7 @@ public class KitService(GCStockDbContext db, ICurrentUserContext currentUser, IA
         db.Kits.Add(saved);
         await db.SaveChangesAsync(ct);
         await audit.RecordAsync("criou", "Kit de Churrasco", saved.Name, null, ct);
-        return ToDto(saved, await CompanyMinMarginAsync(ct));
+        return ToDto(saved, await CompanyMinMarginAsync(ct), requestedProducts);
     }
 
     public async Task<List<KitCostHistoryDto>> GetCostHistoryAsync(Guid kitId, CancellationToken ct)
@@ -206,8 +212,9 @@ public class KitService(GCStockDbContext db, ICurrentUserContext currentUser, IA
         };
     }
 
-    private static KitDto ToDto(Kit k, decimal companyMinMargin)
+    private static KitDto ToDto(Kit k, decimal companyMinMargin, IReadOnlyDictionary<Guid, Product> products)
     {
+        var kitsAvailable = KitPricing.MaxKits(k, products);
         var minMargin = k.MinMarginPercent ?? companyMinMargin;
         var priceForMin = k.CostPrice > 0 ? KitPricing.PriceForMargin(k.CostPrice, minMargin) : 0m;
         var below = k.CostPrice > 0 && k.MarginPercent < minMargin;
@@ -217,7 +224,7 @@ public class KitService(GCStockDbContext db, ICurrentUserContext currentUser, IA
             k.TotalWeightKg, k.ImageUrl, k.ComponentsSummary,
             k.Components.Select(c => new KitComponentDto(
                 c.ProductId, c.Name, c.Code, c.LotNumber, c.Quantity, c.Unit, c.UnitCost, c.Subtotal, c.AvailableStock)).ToList(),
-            k.StockAvailable, k.StockStatus, k.BarcodeEan,
+            kitsAvailable, KitPricing.StockStatus(kitsAvailable), k.BarcodeEan,
             minMargin, k.MinMarginPercent is null, below, priceForMin, below ? Math.Max(0m, priceForMin - k.SuggestedPrice) : 0m);
     }
 }

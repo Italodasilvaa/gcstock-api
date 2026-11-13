@@ -2,6 +2,7 @@ using GCStock.Application.Audit;
 using GCStock.Application.Abstractions;
 using GCStock.Application.Catalog;
 using GCStock.Domain.Entities;
+using GCStock.Domain.Services;
 using GCStock.Infra.Database;
 using Microsoft.EntityFrameworkCore;
 
@@ -11,10 +12,32 @@ public class ProductService(GCStockDbContext db, ICurrentUserContext currentUser
 {
     public async Task<List<ProductDto>> GetAllAsync(CancellationToken ct)
     {
-        return await db.Products
+        var products = await db.Products
             .Where(p => p.CompanyId == currentUser.CompanyId)
-            .Select(p => ToDto(p))
             .ToListAsync(ct);
+
+        // Validade mais próxima = a do lote com saldo que vence antes, calculada agora. O valor gravado no produto só
+        // vale para estoque sem lote (cadastro manual), porque ele não acompanha as vendas nem a passagem dos dias.
+        var today = ExpiryRules.Today(DateTime.UtcNow);
+        var nearestByProduct = (await db.StockBatches
+                .Where(b => b.CompanyId == currentUser.CompanyId && b.AvailableKg > 0)
+                .Select(b => new { b.ProductId, b.ExpiryDate })
+                .ToListAsync(ct))
+            .GroupBy(b => b.ProductId)
+            .ToDictionary(g => g.Key, g => g.Min(b => b.ExpiryDate));
+
+        return products.Select(p =>
+        {
+            if (!nearestByProduct.TryGetValue(p.Id, out var nearest)) return ToDto(p);
+
+            var days = ExpiryRules.DaysRemaining(nearest, today);
+            return ToDto(p) with
+            {
+                NearestExpiry = nearest,
+                ExpiryDaysRemaining = days,
+                ExpiryStatus = ExpiryRules.ProductStatus(days, p.AlertDays),
+            };
+        }).ToList();
     }
 
     public async Task<ProductDto> SaveAsync(SaveProductRequest request, CancellationToken ct)
@@ -28,7 +51,10 @@ public class ProductService(GCStockDbContext db, ICurrentUserContext currentUser
                 if (request.Name is not null) existing.Name = request.Name;
                 if (request.Category is not null) existing.Category = request.Category;
                 if (request.Unit is not null) existing.Unit = request.Unit;
+                var stockBefore = existing.Stock;
                 if (request.Stock is not null) existing.Stock = request.Stock.Value;
+                // Todo ajuste de saldo deixa rastro: quanto era, quanto ficou, quem fez.
+                AddAdjustmentMovement(existing, stockBefore, existing.Stock);
                 if (request.MinStock is not null) existing.MinStock = request.MinStock.Value;
                 var costBefore = CostHistory.Snapshot([existing]);
                 if (request.CostPrice is not null) existing.CostPrice = request.CostPrice.Value;
@@ -88,6 +114,7 @@ public class ProductService(GCStockDbContext db, ICurrentUserContext currentUser
             IsPromo = request.IsPromo ?? false,
         };
         db.Products.Add(saved);
+        AddAdjustmentMovement(saved, 0m, saved.Stock);
         // Custo informado no cadastro é o primeiro ponto do histórico (de zero para o custo inicial).
         CostHistory.RecordChanges(
             db, currentUser.CompanyId, currentUser.UserName, new Dictionary<Guid, decimal> { [saved.Id] = 0m }, [saved], "ajuste_manual", null);
@@ -117,6 +144,27 @@ public class ProductService(GCStockDbContext db, ICurrentUserContext currentUser
         db.Products.Remove(target);
         await db.SaveChangesAsync(ct);
         await audit.RecordAsync("excluiu", "Produto", target.Name, null, ct);
+    }
+
+    /// <summary>Movimentação "ajuste_estoque" quando o saldo do produto é digitado à mão (cadastro ou edição).</summary>
+    private void AddAdjustmentMovement(Product product, decimal before, decimal after)
+    {
+        var delta = after - before;
+        if (delta == 0) return;
+
+        db.StockMovements.Add(new StockMovement
+        {
+            CompanyId = currentUser.CompanyId,
+            Timestamp = DateTime.UtcNow,
+            Type = "ajuste_estoque",
+            Title = $"Ajuste de estoque: {product.Name}",
+            DocInfo = "Cadastro do produto",
+            AmountKg = delta,
+            Unit = product.Unit,
+            Description = $"Saldo ajustado de {before:0.###} para {after:0.###} {product.Unit} por {currentUser.UserName}",
+            BadgeLabel = "Ajuste",
+            AuditLink = product.Sku,
+        });
     }
 
     private static ProductDto ToDto(Product p) => new(

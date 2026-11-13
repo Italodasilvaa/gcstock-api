@@ -150,7 +150,7 @@ public class StockLossService(GCStockDbContext db, ICurrentUserContext currentUs
         {
             CompanyId = currentUser.CompanyId,
             Timestamp = now,
-            Type = "entrada",
+            Type = "estorno_perda",
             Title = $"Perda desfeita: {loss.ProductName}",
             DocInfo = $"Perda de {loss.Date:dd/MM/yyyy} desfeita por {currentUser.UserName}",
             AmountKg = loss.Qty,

@@ -1,4 +1,5 @@
 using GCStock.Domain.Entities;
+using GCStock.Domain.Services;
 using GCStock.Infra.Database;
 using Microsoft.EntityFrameworkCore;
 
@@ -13,8 +14,9 @@ namespace GCStock.Infra.Services;
 internal static class StockLots
 {
     /// <summary>
-    /// Tira `quantity` do produto consumindo primeiro os lotes que vencem antes (pedido mais antigo primeiro) e devolve de quais lotes saiu,
-    /// para o cancelamento da venda poder devolver ao mesmo lote. O que não estiver coberto por lotes não é registrado.
+    /// FEFO (First Expire, First Out): tira `quantity` do produto consumindo primeiro o lote que vence antes (empate: o que
+    /// entrou antes) e devolve de quais lotes saiu, para o cancelamento da venda poder devolver ao mesmo lote.
+    /// Lote vencido nunca é consumido (não pode ser vendido). O que não estiver coberto por lotes não é registrado.
     /// </summary>
     public static async Task<List<(Guid LotId, decimal Qty)>> ConsumeAsync(
         GCStockDbContext db, Guid companyId, Guid productId, decimal quantity, CancellationToken ct)
@@ -22,15 +24,16 @@ internal static class StockLots
         var taken = new List<(Guid LotId, decimal Qty)>();
         if (quantity <= 0) return taken;
 
+        var today = ExpiryRules.Today(DateTime.UtcNow);
         var fromDb = await db.StockBatches
             .Where(b => b.CompanyId == companyId && b.ProductId == productId)
             .ToListAsync(ct);
         var lots = db.StockBatches.Local
             .Where(b => b.CompanyId == companyId && b.ProductId == productId)
             .Union(fromDb)
-            .Where(b => b.AvailableKg > 0)
-            .OrderBy(b => b.EntryDate)
-            .ThenBy(b => b.ExpiryDate)
+            .Where(b => b.AvailableKg > 0 && !ExpiryRules.IsExpired(b.ExpiryDate, today))
+            .OrderBy(b => b.ExpiryDate)
+            .ThenBy(b => b.EntryDate)
             .ToList();
 
         var remaining = quantity;

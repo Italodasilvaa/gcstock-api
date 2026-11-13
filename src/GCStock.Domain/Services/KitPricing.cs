@@ -18,6 +18,30 @@ public static class KitPricing
         marginPercent >= 100m ? 0m : Math.Ceiling(cost / (1m - marginPercent / 100m) * 100m) / 100m;
 
     /// <summary>
+    /// Quantos kits dá para montar agora: o menor (estoque ÷ quantidade) entre os componentes, arredondado para baixo.
+    /// É o que limita a venda de verdade; o número guardado no kit não entra na conta. Produto que não existe mais
+    /// (ou sem estoque) zera a disponibilidade. Kit sem componentes não tem como ser montado: 0.
+    /// </summary>
+    public static decimal MaxKits(Kit kit, IReadOnlyDictionary<Guid, Product> products)
+    {
+        if (kit.Components.Count == 0) return 0m;
+
+        var max = decimal.MaxValue;
+        foreach (var component in kit.Components)
+        {
+            if (component.Quantity <= 0) continue;
+            var stock = products.TryGetValue(component.ProductId, out var product) ? Math.Max(0m, product.Stock) : 0m;
+            max = Math.Min(max, Math.Floor(stock / component.Quantity));
+        }
+
+        return max == decimal.MaxValue ? 0m : max;
+    }
+
+    /// <summary>Faixa de disponibilidade exibida: "alerta" (0 a 2 kits) | "disponivel" (3 a 9) | "amplo" (10 ou mais).</summary>
+    public static string StockStatus(decimal kitsAvailable) =>
+        kitsAvailable >= 10m ? "amplo" : kitsAvailable >= 3m ? "disponivel" : "alerta";
+
+    /// <summary>
     /// Atualiza os componentes (custo e subtotal), o custo total, a margem e — quando todos os componentes são medidos em kg —
     /// o peso total. Componente cujo produto não está em <paramref name="products"/> mantém o custo gravado.
     /// Devolve true se custo ou margem do kit mudaram.

@@ -1,5 +1,6 @@
 using GCStock.Application.Abstractions;
 using GCStock.Application.Inventory;
+using GCStock.Domain.Services;
 using GCStock.Infra.Database;
 using Microsoft.EntityFrameworkCore;
 
@@ -15,38 +16,48 @@ public class InventoryService(GCStockDbContext db, ICurrentUserContext currentUs
     public async Task<List<StockBatchDto>> GetBatchesAsync(CancellationToken ct)
     {
         // Lotes totalmente consumidos pelas vendas não aparecem no estoque.
-        var batches = await db.StockBatches
+        var lots = await db.StockBatches
             .Where(b => b.CompanyId == currentUser.CompanyId && b.AvailableKg > 0)
             .OrderBy(b => b.ExpiryDate)
-            .Select(b => new StockBatchDto(
-                b.Id, b.ProductId, b.ProductName, b.Sku, b.LotNumber, b.AvailableKg,
-                b.EntryDate, b.ExpiryDate, b.DaysRemaining, b.FiscalDoc, b.Supplier, b.Status, b.Unit, b.UnitCost,
-                db.PurchaseEntries.Where(p => p.Id == b.PurchaseEntryId && p.CompanyId == b.CompanyId).Select(p => p.OrderCode).FirstOrDefault() ?? ""))
             .ToListAsync(ct);
+        var purchaseIds = lots.Where(b => b.PurchaseEntryId.HasValue).Select(b => b.PurchaseEntryId!.Value).Distinct().ToList();
+        var orderCodes = purchaseIds.Count > 0
+            ? await db.PurchaseEntries
+                .Where(p => p.CompanyId == currentUser.CompanyId && purchaseIds.Contains(p.Id))
+                .ToDictionaryAsync(p => p.Id, p => p.OrderCode, ct)
+            : [];
+
+        var products = await db.Products
+            .Where(p => p.CompanyId == currentUser.CompanyId)
+            .ToDictionaryAsync(p => p.Id, ct);
+
+        // Dias restantes e status são calculados de hoje, não lidos do que foi gravado na entrada (que envelhece).
+        var today = ExpiryRules.Today(DateTime.UtcNow);
+        var batches = lots.Select(b =>
+        {
+            var days = ExpiryRules.DaysRemaining(b.ExpiryDate, today);
+            var alertDays = products.TryGetValue(b.ProductId, out var owner) ? owner.AlertDays : 3;
+            return new StockBatchDto(
+                b.Id, b.ProductId, b.ProductName, b.Sku, b.LotNumber, b.AvailableKg,
+                b.EntryDate, b.ExpiryDate, days, b.FiscalDoc, b.Supplier, ExpiryRules.LotStatus(days, alertDays), b.Unit, b.UnitCost,
+                b.PurchaseEntryId.HasValue && orderCodes.TryGetValue(b.PurchaseEntryId.Value, out var code) ? code : "");
+        }).ToList();
 
         var batchedByProduct = batches
             .GroupBy(b => b.ProductId)
             .ToDictionary(g => g.Key, g => g.Sum(b => b.AvailableKg));
 
-        var products = await db.Products
-            .Where(p => p.CompanyId == currentUser.CompanyId && p.Stock > 0)
-            .ToListAsync(ct);
-
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
-        foreach (var product in products)
+        foreach (var product in products.Values.Where(p => p.Stock > 0))
         {
             var withoutLot = product.Stock - batchedByProduct.GetValueOrDefault(product.Id);
             if (withoutLot <= 0) continue;
 
-            var daysRemaining = product.NearestExpiry.DayNumber - today.DayNumber;
+            var daysRemaining = ExpiryRules.DaysRemaining(product.NearestExpiry, today);
             batches.Add(new StockBatchDto(
                 product.Id, product.Id, product.Name, product.Sku, "Sem lote", withoutLot,
                 today, product.NearestExpiry, daysRemaining, "—",
                 string.IsNullOrWhiteSpace(product.Supplier) ? "—" : product.Supplier,
-                daysRemaining < 0 ? "vencido"
-                    : product.ExpiryStatus == "critico" ? "urgente"
-                    : product.ExpiryStatus == "normal" ? "regular"
-                    : "novo",
+                ExpiryRules.LotStatus(daysRemaining, product.AlertDays),
                 product.Unit, product.CostPrice));
         }
 
