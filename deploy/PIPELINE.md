@@ -11,12 +11,12 @@ Duas esteiras no Azure Pipelines, uma em cada repositório, com o mesmo fluxo:
 
 ```
 feature ──PR──▶ main        valida (não publica)
-main ──merge──▶ staging     valida, gera imagem e publica em HOMOLOGAÇÃO
-staging ──merge──▶ production   valida, gera imagem e publica em PRODUÇÃO (com aprovação manual)
+main ──merge──▶ stg         valida, gera imagem e publica em HOMOLOGAÇÃO
+stg ──merge──▶ prod        valida, gera imagem e publica em PRODUÇÃO (com aprovação manual)
 ```
 
-- **Pull Request** (para `main`, `staging` ou `production`): só valida (API: build e testes; UI: checagem de tipos e build). Não gera imagem nem publica.
-- **Push em `staging` ou `production`**: valida, gera a imagem com a tag do build (`<BuildId>` e `latest-<ambiente>`), publica no Swarm e confere a saúde.
+- **Pull Request** (para `main`, `stg` ou `prod`): só valida (API: build e testes; UI: checagem de tipos e build). Não gera imagem nem publica.
+- **Push em `stg` ou `prod`**: valida, gera a imagem com a tag do build (`<BuildId>` e `latest-<ambiente>`), publica no Swarm e confere a saúde.
 - A UI de cada ambiente é construída apontando para a API do mesmo ambiente (`angular.json`: configuração `staging` ou `production`), então homologação e produção nunca se misturam.
 - Publique primeiro a **API** e depois a **UI** quando a mudança mexer nos dois (a UI nova pode depender de rotas novas da API).
 
@@ -63,7 +63,7 @@ docker exec -i "$PG" pg_restore --clean --if-exists -U admin -d gcstock_prd < /v
 
 ## Configuração única (fazer uma vez)
 
-1. **Branches:** crie `staging` e `production` a partir de `main` nos dois repositórios (`git branch staging main && git push -u origin staging`, idem `production`).
+1. **Branches:** crie `stg` e `prod` a partir de `main` nos dois repositórios (`git branch stg main && git push -u origin stg`, idem `prod`).
 2. **Pipeline da UI:** no Azure DevOps, Pipelines > New pipeline > GitHub > `gcstock-ui` > "Existing Azure Pipelines YAML file" > `/azure-pipelines.yml`. (O da API já existe.)
 3. **Service connections** (já usadas pela esteira da API, a UI reaproveita): `registry.iwsolutions.cloud` (Docker Registry) e `swarm-production` / `swarm-staging` (SSH para a VPS).
 4. **Environments** `production` e `staging` (Pipelines > Environments). Em **`production`**, adicione **Approvals and checks > Approvals** com você como aprovador: assim, produção só publica depois do seu OK.

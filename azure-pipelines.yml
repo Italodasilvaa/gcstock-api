@@ -1,22 +1,22 @@
 # Esteira da API (GC Stock API + Worker): valida, gera as imagens e publica no Swarm da VPS.
 #
-# Fluxo:  feature -> Pull Request (só valida) -> branch "staging" (publica em homologação) -> branch "production" (publica em produção).
+# Fluxo:  feature -> Pull Request (só valida) -> branch "stg" (publica em homologação) -> branch "prod" (publica em produção).
 # Antes de publicar, a esteira faz BACKUP do banco: as migrations rodam sozinhas quando a API sobe
 # (Database__MigrateOnStartup), então sempre existe um ponto de volta com os dados.
 
 trigger:
   branches:
     include:
-      - production
-      - staging
+      - prod
+      - stg
 
 # Pull Request: roda só a validação (build + testes), sem gerar imagem nem publicar.
 pr:
   branches:
     include:
       - main
-      - staging
-      - production
+      - stg
+      - prod
 
 variables:
   RegistryUrl: "registry.iwsolutions.cloud"
@@ -31,13 +31,13 @@ variables:
   # Quantos backups manter por banco: os mais antigos são apagados. BackupPruneFrom = BackupKeep + 1.
   BackupKeep: "14"
   BackupPruneFrom: "15"
-  ${{ if eq(variables['Build.SourceBranchName'], 'production') }}:
+  ${{ if eq(variables['Build.SourceBranchName'], 'prod') }}:
     Environment: "production"
     AspNetEnvironment: "Production"
     StackName: "gcstock-prd"
     HostDomain: "api.iwsolutions.cloud"
     DatabaseName: "gcstock_prd"
-  ${{ if eq(variables['Build.SourceBranchName'], 'staging') }}:
+  ${{ if eq(variables['Build.SourceBranchName'], 'stg') }}:
     Environment: "staging"
     AspNetEnvironment: "Staging"
     StackName: "gcstock-nprd"
@@ -87,7 +87,7 @@ stages:
               testResultsFormat: "VSTest"
               testResultsFiles: "**/*.trx"
 
-          # Só gera e envia as imagens nas branches de publicação (Pull Request para aqui).
+          # Só gera e envia as imagens nas branches de publicação (stg e prod) (Pull Request para aqui).
           - task: Docker@2
             displayName: "Build e push da API"
             condition: and(succeeded(), ne(variables['Build.Reason'], 'PullRequest'))
