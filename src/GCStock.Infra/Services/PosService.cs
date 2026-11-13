@@ -211,14 +211,17 @@ public class PosService(GCStockDbContext db, ICurrentUserContext currentUser, IA
             throw new ArgumentException("A venda precisa ter ao menos um item e todas as quantidades devem ser maiores que zero.");
         }
 
-        var rnd = Random.Shared;
         var saleId = Guid.CreateVersion7();
-        var receiptNumber = "NFCe-" + rnd.Next(100000, 1000000);
         var now = DateTime.UtcNow;
 
         // Tudo-ou-nada, e os produtos ficam travados até o fim: duas vendas simultâneas do mesmo produto não
         // conseguem, juntas, passar do estoque.
         await using var transaction = await db.Database.BeginTransactionAsync(ct);
+
+        // O lock por empresa serializa a numeração: duas vendas ao mesmo tempo nunca recebem o mesmo número.
+        await db.Database.ExecuteSqlInterpolatedAsync(
+            $"SELECT pg_advisory_xact_lock(hashtextextended({currentUser.CompanyId.ToString() + ":vendas"}, 0))", ct);
+        var receiptNumber = await NextReceiptNumberAsync(now, ct);
 
         // Baixa automática de estoque: produto avulso desconta ele mesmo; kit desconta cada componente
         // proporcionalmente à quantidade de kits vendidos.
@@ -247,6 +250,19 @@ public class PosService(GCStockDbContext db, ICurrentUserContext currentUser, IA
         EnsureStockAvailable(request, products, kits);
         await EnsureNotExpiredAsync(request, products, kits, ct);
         var chosenLots = await LoadChosenLotsAsync(request, products, ct);
+
+        // Valores definitivos: o servidor calcula desconto, taxa, total cobrado e líquido a partir dos itens e da forma de
+        // pagamento cadastrada. O que a tela enviou só é conferido: se não bate, a venda é recusada em vez de cobrar errado.
+        var payment = await ResolvePaymentAsync(request, ct);
+        var itemsSubtotal = request.Items.Sum(i => Math.Round(i.Qty * i.Price, 2, MidpointRounding.AwayFromZero));
+        var pricing = SalePricing.Calculate(itemsSubtotal, request.Discount, payment.FeePercent, payment.FixedFee, request.PassFeeToCustomer);
+        if (Math.Abs(pricing.Total - request.Total) > 0.01m)
+        {
+            throw new InvalidOperationException(
+                $"O valor da venda mudou: a tela mostrava {request.Total.ToString("C", PtBr)} e o sistema calculou {pricing.Total.ToString("C", PtBr)} " +
+                "(preço ou taxa de pagamento atualizados). Atualize a tela e confira antes de finalizar.");
+        }
+        var installments = ValidInstallments(payment.Mode, request.Installments);
 
         var saleItems = new List<SaleItem>();
 
@@ -288,7 +304,7 @@ public class PosService(GCStockDbContext db, ICurrentUserContext currentUser, IA
                 Timestamp = now,
                 Type = "baixa_pdv",
                 Title = $"Venda {receiptNumber}: {line.Name}",
-                DocInfo = $"Tíquete Balcão 01 • {request.PaymentMode} • {request.Total.ToString("C", PtBr)}",
+                DocInfo = $"Tíquete Balcão 01 • {payment.Mode} • {pricing.Total.ToString("C", PtBr)}",
                 AmountKg = -line.Qty,
                 Unit = lineUnit,
                 Description = $"Baixa realizada no PDV: {line.Qty}x {line.Name}" + (chosenLot is null ? "" : $" • Lote {chosenLot.LotNumber}"),
@@ -336,70 +352,91 @@ public class PosService(GCStockDbContext db, ICurrentUserContext currentUser, IA
         // As vendas baixam o estoque do produto; os lotes acompanham (consome primeiro o pedido mais antigo).
         await StockLots.ReconcileAsync(db, currentUser.CompanyId, [.. products.Values], ct);
 
-        // Pagamento a crédito/parcelado gera um recebível de adquirente para D+30.
-        if (request.PaymentMode is "credito_vista" or "parcelado")
+        var cardFlag = request.CardFlag ?? "Mastercard";
+
+        // Cartão: crédito à vista = 1 recebível de adquirente em D+30; parcelado = 1 recebível por parcela (30, 60, 90... dias).
+        // A soma das parcelas fecha exatamente o total cobrado, a taxa e o líquido (diferença de centavos vai para a última).
+        if (payment.Mode is "credito_vista" or "parcelado")
         {
-            var dueDate = DateOnly.FromDateTime(now.AddDays(30));
-            db.AccountsReceivables.Add(new AccountsReceivable
+            var grossParts = SalePricing.SplitInstallments(pricing.Total, installments);
+            var feeParts = SalePricing.SplitInstallments(pricing.Fee, installments);
+            for (var n = 1; n <= installments; n++)
             {
-                CompanyId = currentUser.CompanyId,
-                ClientOrOrigin = $"Adquirente {request.CardFlag ?? "Mastercard"} - PDV Balcão 01",
-                SubCategory = "Venda Crédito à Vista (TEF Balcão)",
-                Reference = receiptNumber,
-                DueDate = dueDate,
-                DueLabel = "Em 30 dias",
-                GrossAmount = request.Total,
-                FeeRetention = request.FeeAmount,
-                NetAmount = request.NetAmount,
-                Status = "a_vencer",
-                Type = "adquirente",
-                PaymentModeDesc = $"{request.CardFlag ?? "Mastercard"} D+30",
-            });
+                var dueDate = DateOnly.FromDateTime(now.AddDays(30 * n));
+                var suffix = installments > 1 ? $" • parcela {n}/{installments}" : string.Empty;
+                db.AccountsReceivables.Add(new AccountsReceivable
+                {
+                    CompanyId = currentUser.CompanyId,
+                    SaleId = saleId,
+                    ClientOrOrigin = $"Adquirente {cardFlag} - PDV Balcão 01",
+                    SubCategory = (installments > 1 ? "Venda Crédito Parcelado (TEF Balcão)" : "Venda Crédito à Vista (TEF Balcão)") + suffix,
+                    Reference = receiptNumber,
+                    DueDate = dueDate,
+                    DueLabel = DateLabelHelper.DueLabelFor(dueDate),
+                    GrossAmount = grossParts[n - 1],
+                    FeeRetention = feeParts[n - 1],
+                    NetAmount = grossParts[n - 1] - feeParts[n - 1],
+                    Status = "a_vencer",
+                    Type = "adquirente",
+                    PaymentModeDesc = $"{cardFlag} D+{30 * n}{suffix}",
+                    InstallmentNumber = n,
+                    InstallmentCount = installments,
+                });
+            }
         }
 
-        // Venda a prazo: gera um título a receber vinculado ao cliente escolhido, para cobrança posterior.
-        if (request.PaymentMode == "a_prazo")
+        // Venda a prazo: gera os títulos a receber vinculados ao cliente escolhido (1 por parcela, de mês em mês a partir
+        // do primeiro vencimento), para cobrança posterior.
+        if (payment.Mode == "a_prazo")
         {
-            var dueDate = request.DueDate ?? DateOnly.FromDateTime(now.AddDays(30));
-            db.AccountsReceivables.Add(new AccountsReceivable
+            var firstDue = request.DueDate ?? DateOnly.FromDateTime(now.AddDays(30));
+            var parts = SalePricing.SplitInstallments(pricing.Total, installments);
+            for (var n = 1; n <= installments; n++)
             {
-                CompanyId = currentUser.CompanyId,
-                ClientOrOrigin = request.ClientName ?? "Cliente Avulso (A Prazo)",
-                SubCategory = "Venda a Prazo • PDV Balcão 01",
-                Reference = receiptNumber,
-                DueDate = dueDate,
-                DueLabel = DateLabelHelper.DueLabelFor(dueDate),
-                GrossAmount = request.Total,
-                FeeRetention = 0,
-                NetAmount = request.Total,
-                Status = "a_vencer",
-                Type = "b2b",
-                PaymentModeDesc = "Fiado / A Prazo (D+30)",
-                ClientId = request.ClientId,
-            });
+                var dueDate = firstDue.AddMonths(n - 1);
+                var suffix = installments > 1 ? $" • parcela {n}/{installments}" : string.Empty;
+                db.AccountsReceivables.Add(new AccountsReceivable
+                {
+                    CompanyId = currentUser.CompanyId,
+                    SaleId = saleId,
+                    ClientOrOrigin = request.ClientName ?? "Cliente Avulso (A Prazo)",
+                    SubCategory = "Venda a Prazo • PDV Balcão 01" + suffix,
+                    Reference = receiptNumber,
+                    DueDate = dueDate,
+                    DueLabel = DateLabelHelper.DueLabelFor(dueDate),
+                    GrossAmount = parts[n - 1],
+                    FeeRetention = 0,
+                    NetAmount = parts[n - 1],
+                    Status = "a_vencer",
+                    Type = "b2b",
+                    PaymentModeDesc = "Fiado / A Prazo" + suffix,
+                    ClientId = request.ClientId,
+                    InstallmentNumber = n,
+                    InstallmentCount = installments,
+                });
+            }
 
             if (request.ClientId.HasValue)
             {
                 var client = await db.Clients.FirstOrDefaultAsync(c => c.Id == request.ClientId && c.CompanyId == currentUser.CompanyId, ct);
                 if (client is not null)
                 {
-                    client.TotalSpent += request.Total;
+                    client.TotalSpent += pricing.Total;
                 }
             }
         }
 
-        var subtotal = saleItems.Sum(i => i.Subtotal);
         db.SaleRecords.Add(new SaleRecord
         {
             CompanyId = currentUser.CompanyId,
             SaleId = saleId,
             ReceiptNumber = receiptNumber,
             Timestamp = now,
-            Total = request.Total,
-            NetAmount = request.NetAmount,
-            FeeAmount = request.FeeAmount,
-            DiscountAmount = Math.Max(0, subtotal - request.Total),
-            PaymentMode = request.PaymentMode,
+            Total = pricing.Total,
+            NetAmount = pricing.Net,
+            FeeAmount = pricing.Fee,
+            DiscountAmount = pricing.Discount,
+            PaymentMode = payment.Mode,
             CardFlag = request.CardFlag,
             ClientId = request.ClientId,
             ClientName = request.ClientName,
@@ -410,10 +447,66 @@ public class PosService(GCStockDbContext db, ICurrentUserContext currentUser, IA
         await db.SaveChangesAsync(ct);
         await audit.RecordAsync(
             "vendeu", "Venda PDV",
-            $"{receiptNumber} • {request.Total.ToString("C", PtBr)}",
-            request.ClientName ?? request.PaymentMode, ct);
+            $"{receiptNumber} • {pricing.Total.ToString("C", PtBr)}",
+            request.ClientName ?? payment.Mode, ct);
         await transaction.CommitAsync(ct);
 
-        return new FinalizeSaleResult(saleId, receiptNumber);
+        return new FinalizeSaleResult(saleId, receiptNumber, pricing.Total, pricing.Net, pricing.Fee, pricing.Discount, installments);
+    }
+
+    /// <summary>VEN-{ano}-{sequência de 6 dígitos}, único por empresa (o lock da venda garante que ninguém pega o mesmo).</summary>
+    private async Task<string> NextReceiptNumberAsync(DateTime now, CancellationToken ct)
+    {
+        var prefix = $"VEN-{ExpiryRules.Today(now).Year}-";
+        var existing = await db.SaleRecords
+            .Where(s => s.CompanyId == currentUser.CompanyId && s.ReceiptNumber.StartsWith(prefix))
+            .Select(s => s.ReceiptNumber)
+            .ToListAsync(ct);
+
+        var next = existing
+            .Select(code => int.TryParse(code[prefix.Length..], out var n) ? n : 0)
+            .DefaultIfEmpty(0)
+            .Max() + 1;
+        return $"{prefix}{next:D6}";
+    }
+
+    private sealed record PaymentRule(string Mode, decimal FeePercent, decimal FixedFee);
+
+    /// <summary>
+    /// Forma de pagamento e taxa vêm do cadastro da empresa (Configurações), nunca do que a tela mandou. Sem id de forma de
+    /// pagamento, usa a primeira ativa do tipo informado; sem nenhuma, a venda segue sem taxa.
+    /// </summary>
+    private async Task<PaymentRule> ResolvePaymentAsync(FinalizeSaleRequest request, CancellationToken ct)
+    {
+        if (request.PaymentOptionId.HasValue)
+        {
+            var option = await db.PaymentFeeSettings.FirstOrDefaultAsync(
+                f => f.Id == request.PaymentOptionId && f.CompanyId == currentUser.CompanyId && f.Active, ct)
+                ?? throw new ArgumentException("A forma de pagamento escolhida não foi encontrada ou está inativa.");
+            return new PaymentRule(SalePricing.InferMode(option.Method), option.FeePercent, option.FixedFee ?? 0m);
+        }
+
+        if (!SalePricing.Modes.Contains(request.PaymentMode))
+        {
+            throw new ArgumentException($"Forma de pagamento inválida: {request.PaymentMode}.");
+        }
+
+        var options = await db.PaymentFeeSettings
+            .Where(f => f.CompanyId == currentUser.CompanyId && f.Active)
+            .OrderBy(f => f.SortOrder)
+            .ToListAsync(ct);
+        var match = options.FirstOrDefault(f => SalePricing.InferMode(f.Method) == request.PaymentMode);
+        return new PaymentRule(request.PaymentMode, match?.FeePercent ?? 0m, match?.FixedFee ?? 0m);
+    }
+
+    /// <summary>Parcelas só existem em cartão parcelado e venda a prazo (1 a 12); nos demais pagamentos é sempre 1.</summary>
+    private static int ValidInstallments(string mode, int requested)
+    {
+        if (mode is not ("parcelado" or "a_prazo")) return 1;
+        if (requested < 1 || requested > SalePricing.MaxInstallments)
+        {
+            throw new ArgumentException($"O número de parcelas deve ficar entre 1 e {SalePricing.MaxInstallments}.");
+        }
+        return requested;
     }
 }

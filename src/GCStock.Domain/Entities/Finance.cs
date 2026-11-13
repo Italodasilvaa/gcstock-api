@@ -67,6 +67,13 @@ public class AccountsReceivable
     public DateOnly? ReceivedDate { get; set; }
 
     public Guid? ClientId { get; set; }
+
+    /// <summary>Venda (SaleRecord.SaleId) que originou o título: liga o recebível à venda exata, sem depender do número do cupom. Nulo em títulos antigos e lançamentos manuais.</summary>
+    public Guid? SaleId { get; set; }
+
+    /// <summary>Parcela deste título (1 quando não há parcelamento) e quantas parcelas a venda teve.</summary>
+    public int InstallmentNumber { get; set; } = 1;
+    public int InstallmentCount { get; set; } = 1;
 }
 
 public class PaymentFeeSetting

@@ -118,6 +118,16 @@ namespace GCStock.Infra.Database.Migrations
                     b.Property<decimal>("GrossAmount")
                         .HasColumnType("decimal(18,2)");
 
+                    b.Property<int>("InstallmentCount")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(1);
+
+                    b.Property<int>("InstallmentNumber")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(1);
+
                     b.Property<decimal>("NetAmount")
                         .HasColumnType("decimal(18,2)");
 
@@ -131,6 +141,9 @@ namespace GCStock.Infra.Database.Migrations
                     b.Property<string>("Reference")
                         .IsRequired()
                         .HasColumnType("text");
+
+                    b.Property<Guid?>("SaleId")
+                        .HasColumnType("uuid");
 
                     b.Property<string>("Status")
                         .IsRequired()
@@ -147,6 +160,8 @@ namespace GCStock.Infra.Database.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("CompanyId");
+
+                    b.HasIndex("CompanyId", "SaleId");
 
                     b.ToTable("AccountsReceivables");
                 });

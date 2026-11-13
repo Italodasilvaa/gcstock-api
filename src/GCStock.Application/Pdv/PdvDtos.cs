@@ -21,9 +21,27 @@ public record FinalizeSaleRequest(
     DateOnly? DueDate,
     decimal FeeAmount,
     decimal NetAmount,
-    List<PosSaleItem> Items);
+    List<PosSaleItem> Items,
+    // Desconto dado na venda (R$), validado entre 0 e o total dos itens.
+    decimal Discount = 0m,
+    // Forma de pagamento escolhida (id da taxa em Configurações): é de lá que o servidor tira a taxa e o tipo de pagamento.
+    Guid? PaymentOptionId = null,
+    // true = o cliente paga a taxa (total = base + taxa); false = a taxa sai do valor recebido.
+    bool PassFeeToCustomer = true,
+    // Parcelas (cartão parcelado ou venda a prazo): 1 a 12.
+    int Installments = 1);
 
-public record FinalizeSaleResult(Guid SaleId, string ReceiptNumber);
+/// <summary>
+/// Valores definitivos calculados pelo servidor. Total/Net/Fee/Discount são os que ficaram gravados; a tela só os exibe.
+/// </summary>
+public record FinalizeSaleResult(
+    Guid SaleId,
+    string ReceiptNumber,
+    decimal Total = 0m,
+    decimal NetAmount = 0m,
+    decimal FeeAmount = 0m,
+    decimal DiscountAmount = 0m,
+    int Installments = 1);
 
 public interface IPosService
 {

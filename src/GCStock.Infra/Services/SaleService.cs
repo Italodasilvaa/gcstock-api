@@ -41,12 +41,18 @@ public class SaleService(GCStockDbContext db, ICurrentUserContext currentUser, I
             throw new InvalidOperationException("Esta venda já foi cancelada.");
         }
 
-        // O título a receber da venda (cartão ou a prazo) é identificado pelo número do cupom.
-        var receivable = string.IsNullOrEmpty(sale.ReceiptNumber)
-            ? null
-            : await db.AccountsReceivables.FirstOrDefaultAsync(
-                r => r.CompanyId == currentUser.CompanyId && r.Reference == sale.ReceiptNumber, ct);
-        if (receivable?.Status == "recebido")
+        // Os títulos a receber da venda (cartão ou a prazo, 1 por parcela) são identificados pela própria venda. Títulos
+        // antigos, sem vínculo, só são achados pelo número do cupom, e apenas os que ainda não pertencem a nenhuma venda.
+        var receivables = await db.AccountsReceivables
+            .Where(r => r.CompanyId == currentUser.CompanyId && r.SaleId == sale.SaleId)
+            .ToListAsync(ct);
+        if (receivables.Count == 0 && !string.IsNullOrEmpty(sale.ReceiptNumber))
+        {
+            receivables = await db.AccountsReceivables
+                .Where(r => r.CompanyId == currentUser.CompanyId && r.SaleId == null && r.Reference == sale.ReceiptNumber)
+                .ToListAsync(ct);
+        }
+        if (receivables.Any(r => r.Status == "recebido"))
         {
             throw new InvalidOperationException(
                 "O valor desta venda já foi recebido (título liquidado em Contas a Receber) e não pode ser cancelado por aqui.");
@@ -123,7 +129,7 @@ public class SaleService(GCStockDbContext db, ICurrentUserContext currentUser, I
         }
 
         // Desfaz o financeiro da venda.
-        if (receivable is not null) db.AccountsReceivables.Remove(receivable);
+        db.AccountsReceivables.RemoveRange(receivables);
 
         if (sale.PaymentMode == "a_prazo" && sale.ClientId.HasValue)
         {
