@@ -16,6 +16,6 @@ public interface ICardSettlementService
 {
     Task<List<CardSettlementDto>> GetAllAsync(CancellationToken ct);
 
-    /// <summary>Antecipa o recebível cobrando 2,5% de taxa sobre o valor bruto.</summary>
+    /// <summary>Antecipa o título de adquirente: recebe hoje o líquido menos a taxa de antecipação da modalidade (despesa financeira).</summary>
     Task AnticipateAsync(Guid id, CancellationToken ct);
 }

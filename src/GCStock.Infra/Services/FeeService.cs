@@ -41,6 +41,7 @@ public class FeeService(GCStockDbContext db, ICurrentUserContext currentUser, IA
             Channel = request.Channel.Trim(),
             FeePercent = request.FeePercent,
             FixedFee = request.FixedFee,
+            AnticipationFeePercent = ValidAnticipationPercent(request.AnticipationFeePercent),
             SettlementTerm = request.SettlementTerm?.Trim() ?? string.Empty,
             Active = request.Active,
             Icon = string.IsNullOrWhiteSpace(request.Icon) ? "credit_card" : request.Icon.Trim(),
@@ -65,6 +66,7 @@ public class FeeService(GCStockDbContext db, ICurrentUserContext currentUser, IA
         if (request.Channel is not null) fee.Channel = request.Channel;
         if (request.FeePercent is not null) fee.FeePercent = request.FeePercent.Value;
         if (request.FixedFee is not null) fee.FixedFee = request.FixedFee;
+        if (request.AnticipationFeePercent is not null) fee.AnticipationFeePercent = ValidAnticipationPercent(request.AnticipationFeePercent.Value);
         if (request.SettlementTerm is not null) fee.SettlementTerm = request.SettlementTerm;
         if (request.Active is not null) fee.Active = request.Active.Value;
         if (request.Icon is not null) fee.Icon = request.Icon;
@@ -95,6 +97,13 @@ public class FeeService(GCStockDbContext db, ICurrentUserContext currentUser, IA
         return await GetAllAsync(ct);
     }
 
+    private static decimal ValidAnticipationPercent(decimal percent)
+    {
+        if (percent < 0 || percent >= 100) throw new ArgumentException("A taxa de antecipação deve ficar entre 0 e 99,99%.");
+        return Math.Round(percent, 2, MidpointRounding.AwayFromZero);
+    }
+
     private static PaymentFeeSettingDto ToDto(Domain.Entities.PaymentFeeSetting f) => new(
-        f.Id, f.Method, f.Subtitle, f.Channel, f.FeePercent, f.FixedFee, f.SettlementTerm, f.Active, f.Icon, f.SortOrder);
+        f.Id, f.Method, f.Subtitle, f.Channel, f.FeePercent, f.FixedFee, f.SettlementTerm, f.Active, f.Icon, f.SortOrder,
+        f.AnticipationFeePercent);
 }

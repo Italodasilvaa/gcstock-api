@@ -381,6 +381,7 @@ public class PosService(GCStockDbContext db, ICurrentUserContext currentUser, IA
                     PaymentModeDesc = $"{cardFlag} D+{30 * n}{suffix}",
                     InstallmentNumber = n,
                     InstallmentCount = installments,
+                    PaymentFeeSettingId = payment.FeeSettingId,
                 });
             }
         }
@@ -470,7 +471,7 @@ public class PosService(GCStockDbContext db, ICurrentUserContext currentUser, IA
         return $"{prefix}{next:D6}";
     }
 
-    private sealed record PaymentRule(string Mode, decimal FeePercent, decimal FixedFee);
+    private sealed record PaymentRule(string Mode, decimal FeePercent, decimal FixedFee, Guid? FeeSettingId);
 
     /// <summary>
     /// Forma de pagamento e taxa vêm do cadastro da empresa (Configurações), nunca do que a tela mandou. Sem id de forma de
@@ -483,7 +484,7 @@ public class PosService(GCStockDbContext db, ICurrentUserContext currentUser, IA
             var option = await db.PaymentFeeSettings.FirstOrDefaultAsync(
                 f => f.Id == request.PaymentOptionId && f.CompanyId == currentUser.CompanyId && f.Active, ct)
                 ?? throw new ArgumentException("A forma de pagamento escolhida não foi encontrada ou está inativa.");
-            return new PaymentRule(SalePricing.InferMode(option.Method), option.FeePercent, option.FixedFee ?? 0m);
+            return new PaymentRule(SalePricing.InferMode(option.Method), option.FeePercent, option.FixedFee ?? 0m, option.Id);
         }
 
         if (!SalePricing.Modes.Contains(request.PaymentMode))
@@ -496,7 +497,7 @@ public class PosService(GCStockDbContext db, ICurrentUserContext currentUser, IA
             .OrderBy(f => f.SortOrder)
             .ToListAsync(ct);
         var match = options.FirstOrDefault(f => SalePricing.InferMode(f.Method) == request.PaymentMode);
-        return new PaymentRule(request.PaymentMode, match?.FeePercent ?? 0m, match?.FixedFee ?? 0m);
+        return new PaymentRule(request.PaymentMode, match?.FeePercent ?? 0m, match?.FixedFee ?? 0m, match?.Id);
     }
 
     /// <summary>Parcelas só existem em cartão parcelado e venda a prazo (1 a 12); nos demais pagamentos é sempre 1.</summary>

@@ -108,8 +108,15 @@ public static class FinanceEndpoints
 
         group.MapPost("/liquidacoes-cartao/{id:guid}/antecipar", async (Guid id, ICardSettlementService service, CancellationToken ct) =>
         {
-            await service.AnticipateAsync(id, ct);
-            return Results.Ok();
+            try
+            {
+                await service.AnticipateAsync(id, ct);
+                return Results.Ok();
+            }
+            catch (InvalidOperationException ex)
+            {
+                return Results.Conflict(new { message = ex.Message });
+            }
         }).RequireAuthorization(Permissions.CardsAnticipate);
 
         // Situação financeira do período (entradas, vendas, custo, lucro, despesas e resultado). Padrão: mês atual.

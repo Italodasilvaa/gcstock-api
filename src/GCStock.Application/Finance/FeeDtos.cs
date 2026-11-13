@@ -10,7 +10,9 @@ public record PaymentFeeSettingDto(
     string SettlementTerm,
     bool Active,
     string Icon,
-    int SortOrder);
+    int SortOrder,
+    /// <summary>Taxa (%) para antecipar recebíveis desta modalidade, sobre o valor líquido da parcela.</summary>
+    decimal AnticipationFeePercent = 2.5m);
 
 public record ReorderFeesRequest(List<Guid> Ids);
 
@@ -23,7 +25,8 @@ public record SaveFeeRequest(
     decimal? FixedFee,
     string? SettlementTerm,
     bool? Active,
-    string? Icon);
+    string? Icon,
+    decimal? AnticipationFeePercent = null);
 
 public record CreateFeeRequest(
     string Method,
@@ -33,7 +36,8 @@ public record CreateFeeRequest(
     decimal? FixedFee,
     string? SettlementTerm,
     bool Active,
-    string? Icon);
+    string? Icon,
+    decimal AnticipationFeePercent = 2.5m);
 
 public interface IFeeService
 {

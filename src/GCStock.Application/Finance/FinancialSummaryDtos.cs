@@ -57,7 +57,9 @@ public record FinancialSummaryDto(
     decimal StockValue,
     // Lucro por produto
     List<ProductProfitDto> ProductProfits,
-    int EstimatedCostItems);
+    int EstimatedCostItems,
+    // Despesas financeiras: custo das antecipações de recebíveis de cartão feitas no período (reduz o resultado).
+    decimal FinancialExpenses = 0m);
 
 /// <summary>Um mês do balanço: o mesmo cálculo do resultado do período, mês a mês.</summary>
 public record MonthlyBalanceDto(
@@ -71,7 +73,8 @@ public record MonthlyBalanceDto(
     decimal Losses,
     decimal NetResult,
     decimal PurchasesTotal,
-    decimal CapitalExpenses);
+    decimal CapitalExpenses,
+    decimal FinancialExpenses = 0m);
 
 /// <summary>
 /// Lucro de um lote (uma compra de um produto). Receita = parte da receita líquida das vendas que saiu deste lote;

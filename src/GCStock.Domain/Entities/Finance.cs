@@ -74,6 +74,16 @@ public class AccountsReceivable
     /// <summary>Parcela deste título (1 quando não há parcelamento) e quantas parcelas a venda teve.</summary>
     public int InstallmentNumber { get; set; } = 1;
     public int InstallmentCount { get; set; } = 1;
+
+    /// <summary>Forma de pagamento (taxa cadastrada) do cartão que originou o título: dela vem a taxa de antecipação.</summary>
+    public Guid? PaymentFeeSettingId { get; set; }
+
+    /// <summary>
+    /// Custo da antecipação deste título (R$), cobrado sobre o valor líquido. Zero = não foi antecipado. O dinheiro que entra no caixa
+    /// é o líquido menos este custo, e o custo é despesa financeira na DRE na data da antecipação.
+    /// </summary>
+    public decimal AnticipationFee { get; set; }
+    public DateOnly? AnticipatedAt { get; set; }
 }
 
 public class PaymentFeeSetting
@@ -87,6 +97,9 @@ public class PaymentFeeSetting
     public string Channel { get; set; } = string.Empty;
     public decimal FeePercent { get; set; }
     public decimal? FixedFee { get; set; }
+
+    /// <summary>Taxa (%) cobrada para antecipar um recebível desta modalidade, sobre o valor líquido da parcela.</summary>
+    public decimal AnticipationFeePercent { get; set; } = 2.5m;
     public string SettlementTerm { get; set; } = string.Empty;
     public bool Active { get; set; } = true;
     public string Icon { get; set; } = string.Empty;

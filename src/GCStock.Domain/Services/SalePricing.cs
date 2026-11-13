@@ -33,6 +33,13 @@ public static class SalePricing
         return new Result(Round(subtotal), Round(discount), baseAmount, fee, total, net);
     }
 
+    /// <summary>Custo de antecipar um recebível: percentual sobre o valor líquido da parcela, arredondado ao centavo.</summary>
+    public static decimal AnticipationFee(decimal netAmount, decimal percent)
+    {
+        if (percent < 0 || percent >= 100) throw new ArgumentException("A taxa de antecipação deve ficar entre 0 e 99,99%.");
+        return Round(netAmount * percent / 100m);
+    }
+
     /// <summary>Forma de pagamento a partir do nome cadastrado em Configurações (mesma regra que a tela sempre usou).</summary>
     public static string InferMode(string method)
     {

@@ -39,10 +39,14 @@ public class CashService(GCStockDbContext db, ICurrentUserContext currentUser, I
         // Entradas: títulos a receber liquidados
         var received = await db.AccountsReceivables
             .Where(r => r.CompanyId == companyId && r.Status == "recebido")
-            .Select(r => new { r.ReceivedDate, r.DueDate, r.ClientOrOrigin, r.Reference, r.NetAmount })
+            .Select(r => new { r.ReceivedDate, r.DueDate, r.ClientOrOrigin, r.Reference, r.NetAmount, r.AnticipationFee })
             .ToListAsync(ct);
+        // Título antecipado entra no caixa já sem o custo da antecipação (esse custo também é despesa financeira na DRE).
         movements.AddRange(received.Select(r =>
-            new CashMovementDto(r.ReceivedDate ?? r.DueDate, "recebimento", $"Recebido: {r.ClientOrOrigin} ({r.Reference})", r.NetAmount)));
+            new CashMovementDto(
+                r.ReceivedDate ?? r.DueDate, "recebimento",
+                $"Recebido: {r.ClientOrOrigin} ({r.Reference})" + (r.AnticipationFee > 0 ? $" — antecipado, taxa {r.AnticipationFee:C}" : ""),
+                r.NetAmount - r.AnticipationFee)));
 
         // Saídas: toda nota de entrada (compra) sai do caixa na data da entrada, mesmo a prazo ou ainda não paga.
         // Compra cancelada que nunca foi paga não saiu do caixa; a já paga continua como saída (o dinheiro saiu) e só

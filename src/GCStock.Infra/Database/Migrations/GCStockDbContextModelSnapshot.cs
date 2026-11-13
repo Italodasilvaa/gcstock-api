@@ -95,6 +95,14 @@ namespace GCStock.Infra.Database.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
+                    b.Property<DateOnly?>("AnticipatedAt")
+                        .HasColumnType("date");
+
+                    b.Property<decimal>("AnticipationFee")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("decimal(18,2)")
+                        .HasDefaultValue(0m);
+
                     b.Property<Guid?>("ClientId")
                         .HasColumnType("uuid");
 
@@ -130,6 +138,9 @@ namespace GCStock.Infra.Database.Migrations
 
                     b.Property<decimal>("NetAmount")
                         .HasColumnType("decimal(18,2)");
+
+                    b.Property<Guid?>("PaymentFeeSettingId")
+                        .HasColumnType("uuid");
 
                     b.Property<string>("PaymentModeDesc")
                         .IsRequired()
@@ -735,6 +746,11 @@ namespace GCStock.Infra.Database.Migrations
 
                     b.Property<bool>("Active")
                         .HasColumnType("boolean");
+
+                    b.Property<decimal>("AnticipationFeePercent")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("decimal(9,4)")
+                        .HasDefaultValue(2.5m);
 
                     b.Property<string>("Channel")
                         .IsRequired()

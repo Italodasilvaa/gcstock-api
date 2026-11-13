@@ -20,7 +20,7 @@ public class FinancialSummaryService(GCStockDbContext db, ICurrentUserContext cu
             var s = await GetAsync(first, first.AddMonths(1).AddDays(-1), ct);
             months.Add(new MonthlyBalanceDto(
                 month, s.SalesCount, s.NetRevenue, s.CostOfGoodsSold, s.GrossProfit, s.OperatingExpenses,
-                s.Payroll, s.Losses, s.NetResult, s.PurchasesTotal, s.CapitalExpenses));
+                s.Payroll, s.Losses, s.NetResult, s.PurchasesTotal, s.CapitalExpenses, s.FinancialExpenses));
         }
         return months;
     }
@@ -184,7 +184,13 @@ public class FinancialSummaryService(GCStockDbContext db, ICurrentUserContext cu
             .OrderByDescending(x => x.Profit)
             .ToList();
 
-        var netResult = grossProfit - operatingExpenses - payroll - lossesTotal;
+        // ---------- Despesas financeiras: custo de antecipar recebíveis de cartão, na data em que a antecipação aconteceu.
+        // Não é desconto de venda (a taxa do cartão já saiu da receita líquida) nem despesa operacional.
+        var financialExpenses = await db.AccountsReceivables
+            .Where(r => r.CompanyId == companyId && r.AnticipationFee > 0 && r.AnticipatedAt >= from && r.AnticipatedAt <= to)
+            .SumAsync(r => (decimal?)r.AnticipationFee, ct) ?? 0m;
+
+        var netResult = grossProfit - operatingExpenses - payroll - lossesTotal - financialExpenses;
 
         return new FinancialSummaryDto(
             from, to,
@@ -213,6 +219,7 @@ public class FinancialSummaryService(GCStockDbContext db, ICurrentUserContext cu
             expenses,
             stockValue,
             productProfits,
-            completed.SelectMany(s => s.Items).Count(i => i.CostEstimated));
+            completed.SelectMany(s => s.Items).Count(i => i.CostEstimated),
+            financialExpenses);
     }
 }

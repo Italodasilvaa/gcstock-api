@@ -267,6 +267,7 @@ public class GCStockDbContext(DbContextOptions<GCStockDbContext> options) : DbCo
             e.Property(x => x.FeeRetention).HasColumnType(moneyType);
             e.Property(x => x.NetAmount).HasColumnType(moneyType);
             e.HasIndex(x => new { x.CompanyId, x.SaleId });
+            e.Property(x => x.AnticipationFee).HasColumnType(moneyType).HasDefaultValue(0m);
             // Títulos anteriores ao parcelamento contam como parcela única.
             e.Property(x => x.InstallmentNumber).HasDefaultValue(1);
             e.Property(x => x.InstallmentCount).HasDefaultValue(1);
@@ -279,6 +280,7 @@ public class GCStockDbContext(DbContextOptions<GCStockDbContext> options) : DbCo
             e.HasIndex(x => x.CompanyId);
             e.Property(x => x.FeePercent).HasColumnType(percentType);
             e.Property(x => x.FixedFee).HasColumnType(moneyType);
+            e.Property(x => x.AnticipationFeePercent).HasColumnType(percentType).HasDefaultValue(2.5m);
         });
 
         modelBuilder.Entity<CardSettlement>(e =>
