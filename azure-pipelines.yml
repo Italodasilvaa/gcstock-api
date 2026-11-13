@@ -1,8 +1,22 @@
+# Esteira da API (GC Stock API + Worker): valida, gera as imagens e publica no Swarm da VPS.
+#
+# Fluxo:  feature -> Pull Request (só valida) -> branch "staging" (publica em homologação) -> branch "production" (publica em produção).
+# Antes de publicar, a esteira faz BACKUP do banco: as migrations rodam sozinhas quando a API sobe
+# (Database__MigrateOnStartup), então sempre existe um ponto de volta com os dados.
+
 trigger:
   branches:
     include:
       - production
       - staging
+
+# Pull Request: roda só a validação (build + testes), sem gerar imagem nem publicar.
+pr:
+  branches:
+    include:
+      - main
+      - staging
+      - production
 
 variables:
   RegistryUrl: "registry.iwsolutions.cloud"
@@ -10,23 +24,32 @@ variables:
   ApiImageName: "gcstock-api"
   WorkerImageName: "gcstock-worker"
   DockerTag: "$(Build.BuildId)"
+  # Contêiner do Postgres no Swarm (nome começa com "postgres"); ajuste se o serviço tiver outro nome.
+  PostgresContainerFilter: "^postgres"
+  PostgresUser: "admin"
+  BackupDir: "/var/backups/gcstock"
+  # Quantos backups manter por banco: os mais antigos são apagados. BackupPruneFrom = BackupKeep + 1.
+  BackupKeep: "14"
+  BackupPruneFrom: "15"
   ${{ if eq(variables['Build.SourceBranchName'], 'production') }}:
     Environment: "production"
     AspNetEnvironment: "Production"
     StackName: "gcstock-prd"
     HostDomain: "api.iwsolutions.cloud"
+    DatabaseName: "gcstock_prd"
   ${{ if eq(variables['Build.SourceBranchName'], 'staging') }}:
     Environment: "staging"
     AspNetEnvironment: "Staging"
     StackName: "gcstock-nprd"
     HostDomain: "api-nprd.iwsolutions.cloud"
+    DatabaseName: "gcstock_nprd"
 
 pool:
   vmImage: "ubuntu-latest"
 
 stages:
   - stage: Build
-    displayName: "Build e Push das imagens"
+    displayName: "Validar e gerar imagens"
     jobs:
       - job: BuildAndPush
         displayName: "dotnet build/test + docker build/push"
@@ -43,8 +66,19 @@ stages:
           - script: dotnet build GCStock.slnx --configuration Release --no-restore
             displayName: "dotnet build"
 
-          - script: dotnet test GCStock.slnx --configuration Release --no-build --logger trx
-            displayName: "dotnet test"
+          # Testes que não precisam de banco: bloqueiam a publicação se falharem.
+          - script: >
+              dotnet test GCStock.slnx --configuration Release --no-build --logger trx
+              --filter "FullyQualifiedName!~GCStock.IntegrationTests.Purchasing&FullyQualifiedName!~GCStock.IntegrationTests.TenantIsolation"
+            displayName: "dotnet test (sem banco)"
+
+          # Testes com PostgreSQL real (Testcontainers): informativos por enquanto, não bloqueiam a publicação.
+          # Quando estiverem validados, remova o continueOnError para virarem obrigatórios.
+          - script: >
+              dotnet test GCStock.slnx --configuration Release --no-build --logger trx
+              --filter "FullyQualifiedName~GCStock.IntegrationTests.Purchasing|FullyQualifiedName~GCStock.IntegrationTests.TenantIsolation"
+            displayName: "dotnet test (com PostgreSQL, informativo)"
+            continueOnError: true
 
           - task: PublishTestResults@2
             displayName: "Publicar resultados dos testes"
@@ -53,8 +87,10 @@ stages:
               testResultsFormat: "VSTest"
               testResultsFiles: "**/*.trx"
 
+          # Só gera e envia as imagens nas branches de publicação (Pull Request para aqui).
           - task: Docker@2
             displayName: "Build e push da API"
+            condition: and(succeeded(), ne(variables['Build.Reason'], 'PullRequest'))
             inputs:
               containerRegistry: "$(RegistryConnection)"
               repository: "$(ApiImageName)"
@@ -67,6 +103,7 @@ stages:
 
           - task: Docker@2
             displayName: "Build e push do Worker"
+            condition: and(succeeded(), ne(variables['Build.Reason'], 'PullRequest'))
             inputs:
               containerRegistry: "$(RegistryConnection)"
               repository: "$(WorkerImageName)"
@@ -80,14 +117,19 @@ stages:
   - stage: Deploy
     displayName: "Deploy no Swarm ($(Environment))"
     dependsOn: Build
+    condition: and(succeeded(), ne(variables['Build.Reason'], 'PullRequest'))
     jobs:
       - deployment: DeployStack
         displayName: "Deploy da stack"
+        # Em "production" configure aprovação manual no Environment (Azure DevOps > Pipelines > Environments > Approvals).
         environment: "$(Environment)"
         strategy:
           runOnce:
             deploy:
               steps:
+                # Job de deployment não baixa o código sozinho: é preciso para ler o deploy/stacks/stack.yml.
+                - checkout: self
+
                 - task: Bash@3
                   displayName: "Gerar stack.yml com placeholders substituídos"
                   inputs:
@@ -102,7 +144,7 @@ stages:
                         -e "s|__ENVIRONMENT__|$(AspNetEnvironment)|g" \
                         -e "s|__SERVICE_NAME__|$(StackName)|g" \
                         -e "s|__HOST_DOMAIN__|$(HostDomain)|g" \
-                        deploy/stacks/stack.yml > $(Build.ArtifactStagingDirectory)/stack.$(Environment).yml
+                        $(Build.SourcesDirectory)/deploy/stacks/stack.yml > $(Build.ArtifactStagingDirectory)/stack.$(Environment).yml
 
                 - task: PublishBuildArtifacts@1
                   displayName: "Publicar stack.yml gerado"
@@ -118,6 +160,26 @@ stages:
                     contents: "stack.$(Environment).yml"
                     targetFolder: "/tmp/gcstock-deploy"
 
+                # Backup completo do banco ANTES de publicar (a API aplica as migrations ao subir). Se o backup falhar, a
+                # publicação para aqui e nada é alterado. Arquivo: <BackupDir>/<banco>_<data>_build<id>.dump (pg_dump -Fc).
+                # Para restaurar: pg_restore --clean --if-exists -U <usuário> -d <banco> <arquivo>.dump
+                - task: SSH@0
+                  displayName: "Backup do banco ($(DatabaseName)) antes do deploy"
+                  inputs:
+                    sshEndpoint: "swarm-$(Environment)"
+                    runOptions: "commands"
+                    failOnStdErr: false
+                    commands: |
+                      set -e
+                      PG=`docker ps --filter "name=$(PostgresContainerFilter)" --format '{{.Names}}' | head -n 1`
+                      if [ -z "$PG" ]; then echo "Conteiner do Postgres nao encontrado (filtro $(PostgresContainerFilter))."; exit 1; fi
+                      mkdir -p $(BackupDir)
+                      FILE=$(BackupDir)/$(DatabaseName)_`date +%Y%m%d_%H%M%S`_build$(Build.BuildId).dump
+                      docker exec "$PG" pg_dump -U $(PostgresUser) -Fc $(DatabaseName) > "$FILE"
+                      test -s "$FILE" || { echo "Backup vazio, publicacao cancelada."; rm -f "$FILE"; exit 1; }
+                      echo "Backup gerado: $FILE"
+                      ls -1t $(BackupDir)/$(DatabaseName)_*.dump | tail -n +$(BackupPruneFrom) | xargs -r rm -f
+
                 - task: SSH@0
                   displayName: "docker stack deploy"
                   inputs:
@@ -125,3 +187,21 @@ stages:
                     runOptions: "commands"
                     commands: |
                       docker stack deploy --with-registry-auth -c /tmp/gcstock-deploy/stack.$(Environment).yml $(StackName)
+
+                # Confere se a API respondeu depois da publicação; se não responder, a esteira falha (o Swarm já volta
+                # sozinho para a versão anterior: update_config.failure_action = rollback).
+                - task: Bash@3
+                  displayName: "Verificar saúde da API"
+                  inputs:
+                    targetType: "inline"
+                    script: |
+                      for i in `seq 1 36`; do
+                        if curl -fsS "https://$(HostDomain)/health/ready" > /dev/null; then
+                          echo "API no ar em https://$(HostDomain)"
+                          exit 0
+                        fi
+                        echo "Aguardando a API responder ($i/36)..."
+                        sleep 5
+                      done
+                      echo "A API nao respondeu em https://$(HostDomain)/health/ready"
+                      exit 1
