@@ -140,6 +140,9 @@ public class AlertSetting
     /// <summary>Margem mínima padrão (%) dos kits da empresa: abaixo disso o kit é sinalizado. Cada kit pode ter a sua.</summary>
     public decimal MinKitMarginPercent { get; set; } = 30m;
 
+    /// <summary>Meta mensal de faturamento (R$) da empresa, usada no painel. Única por empresa; começa em R$ 3.000.</summary>
+    public decimal MonthlyRevenueGoal { get; set; } = 3000m;
+
     /// <summary>Lista de destinatários serializada com '|' como separador (ver GCStockDbContext).</summary>
     public List<string> Recipients { get; set; } = [];
 }

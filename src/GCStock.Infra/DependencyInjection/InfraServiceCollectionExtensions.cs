@@ -3,6 +3,7 @@ using GCStock.Application.Audit;
 using GCStock.Application.Auth;
 using GCStock.Application.Catalog;
 using GCStock.Application.Clients;
+using GCStock.Application.Dashboard;
 using GCStock.Application.Employees;
 using GCStock.Application.Finance;
 using GCStock.Application.Inventory;
@@ -68,6 +69,7 @@ public static class InfraServiceCollectionExtensions
         services.AddScoped<IPosService, PosService>();
         services.AddScoped<ISaleService, SaleService>();
         services.AddScoped<IFinancialSummaryService, FinancialSummaryService>();
+        services.AddScoped<IDashboardService, DashboardService>();
         services.AddScoped<ICashService, CashService>();
         services.AddScoped<IStockLossService, StockLossService>();
         services.AddScoped<IClientService, ClientService>();

@@ -36,11 +36,13 @@ public class AlertSettingService(GCStockDbContext db, ICurrentUserContext curren
             throw new ArgumentException("A margem mínima dos kits deve ficar entre 0 e 99,99%.");
         }
         settings.MinKitMarginPercent = Math.Round(request.MinKitMarginPercent, 2, MidpointRounding.AwayFromZero);
+        if (request.MonthlyRevenueGoal < 0) throw new ArgumentException("A meta mensal não pode ser negativa.");
+        settings.MonthlyRevenueGoal = Math.Round(request.MonthlyRevenueGoal, 2, MidpointRounding.AwayFromZero);
 
         await db.SaveChangesAsync(ct);
         await audit.RecordAsync("editou", "Alertas Sanitários", "Configuração de alertas de validade", null, ct);
     }
 
     private static GlobalAlertSettingDto ToDto(AlertSetting a) => new(
-        a.AlertLeadDays, a.MorningSummaryTime, a.NotifyTopbar, a.NotifyEmail, a.NotifyWhatsapp, a.Recipients, a.MinKitMarginPercent);
+        a.AlertLeadDays, a.MorningSummaryTime, a.NotifyTopbar, a.NotifyEmail, a.NotifyWhatsapp, a.Recipients, a.MinKitMarginPercent, a.MonthlyRevenueGoal);
 }

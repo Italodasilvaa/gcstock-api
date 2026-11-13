@@ -298,6 +298,7 @@ public class GCStockDbContext(DbContextOptions<GCStockDbContext> options) : DbCo
         {
             e.HasKey(x => x.CompanyId);
             e.Property(x => x.MinKitMarginPercent).HasColumnType(percentType).HasDefaultValue(30m);
+            e.Property(x => x.MonthlyRevenueGoal).HasColumnType(moneyType).HasDefaultValue(3000m);
             e.HasOne(x => x.Company).WithMany().HasForeignKey(x => x.CompanyId).OnDelete(DeleteBehavior.Cascade);
             e.Property(x => x.Recipients)
                 .HasConversion(

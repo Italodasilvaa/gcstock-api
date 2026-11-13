@@ -221,6 +221,11 @@ namespace GCStock.Infra.Database.Migrations
                         .HasColumnType("decimal(9,4)")
                         .HasDefaultValue(30m);
 
+                    b.Property<decimal>("MonthlyRevenueGoal")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("decimal(18,2)")
+                        .HasDefaultValue(3000m);
+
                     b.Property<string>("MorningSummaryTime")
                         .IsRequired()
                         .HasColumnType("text");

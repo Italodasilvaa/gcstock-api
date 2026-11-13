@@ -175,6 +175,7 @@ app.MapPdvEndpoints();
 app.MapSalesEndpoints();
 app.MapLossEndpoints();
 app.MapClientEndpoints();
+app.MapDashboardEndpoints();
 app.MapAuditEndpoints();
 app.MapFileEndpoints();
 
