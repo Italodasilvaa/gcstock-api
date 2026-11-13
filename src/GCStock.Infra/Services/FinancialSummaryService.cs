@@ -104,11 +104,17 @@ public class FinancialSummaryService(GCStockDbContext db, ICurrentUserContext cu
             .ToListAsync(ct);
         var completed = sales.Where(s => s.Status != "cancelada").ToList();
 
-        var grossRevenue = completed.Sum(s => s.Total);
+        // Devoluções do período (pela data da devolução) saem da receita e do custo das mercadorias vendidas. O que foi
+        // devolvido sem condição de revenda não volta ao estoque: o custo dele aparece na linha de perdas, não aqui.
+        var returns = await db.SaleReturns
+            .Where(r => r.CompanyId == companyId && r.Date >= from && r.Date <= to)
+            .ToListAsync(ct);
+
+        var grossRevenue = completed.Sum(s => s.Total) - returns.Sum(r => r.RefundAmount);
         var fees = completed.Sum(s => s.FeeAmount);
         var discounts = completed.Sum(s => s.DiscountAmount);
-        var netRevenue = completed.Sum(s => s.NetAmount);
-        var costOfGoodsSold = completed.Sum(s => s.Items.Sum(i => i.TotalCost));
+        var netRevenue = completed.Sum(s => s.NetAmount) - returns.Sum(r => r.NetRevenueReturned);
+        var costOfGoodsSold = completed.Sum(s => s.Items.Sum(i => i.TotalCost)) - returns.Sum(r => r.CostReturned);
         var grossProfit = netRevenue - costOfGoodsSold;
 
         // ---------- Entradas (compras)

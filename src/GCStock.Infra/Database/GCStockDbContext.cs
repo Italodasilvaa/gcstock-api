@@ -39,6 +39,8 @@ public class GCStockDbContext(DbContextOptions<GCStockDbContext> options) : DbCo
     public DbSet<SaleRecord> SaleRecords => Set<SaleRecord>();
     public DbSet<SaleItem> SaleItems => Set<SaleItem>();
     public DbSet<SaleItemLot> SaleItemLots => Set<SaleItemLot>();
+    public DbSet<SaleReturn> SaleReturns => Set<SaleReturn>();
+    public DbSet<SaleReturnItem> SaleReturnItems => Set<SaleReturnItem>();
 
     public DbSet<AuditLogEntry> AuditLogEntries => Set<AuditLogEntry>();
 
@@ -198,6 +200,27 @@ public class GCStockDbContext(DbContextOptions<GCStockDbContext> options) : DbCo
             e.HasKey(x => x.Id);
             e.HasIndex(x => x.CompanyId);
             e.Property(x => x.Amount).HasColumnType(moneyType);
+        });
+
+        modelBuilder.Entity<SaleReturn>(e =>
+        {
+            e.HasKey(x => x.Id);
+            e.HasIndex(x => new { x.CompanyId, x.Date });
+            e.HasOne(x => x.SaleRecord).WithMany().HasForeignKey(x => x.SaleRecordId).OnDelete(DeleteBehavior.Restrict);
+            e.HasMany(x => x.Items).WithOne(i => i.SaleReturn).HasForeignKey(i => i.SaleReturnId).OnDelete(DeleteBehavior.Cascade);
+            e.Property(x => x.RefundAmount).HasColumnType(moneyType);
+            e.Property(x => x.ReceivableAbated).HasColumnType(moneyType);
+            e.Property(x => x.CashRefundAmount).HasColumnType(moneyType);
+            e.Property(x => x.NetRevenueReturned).HasColumnType(moneyType);
+            e.Property(x => x.CostReturned).HasColumnType(moneyType);
+        });
+
+        modelBuilder.Entity<SaleReturnItem>(e =>
+        {
+            e.HasKey(x => x.Id);
+            e.HasIndex(x => x.SaleItemId);
+            e.Property(x => x.Qty).HasColumnType(qtyType);
+            e.Property(x => x.RefundAmount).HasColumnType(moneyType);
         });
 
         modelBuilder.Entity<KitCostHistory>(e =>

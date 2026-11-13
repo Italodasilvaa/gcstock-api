@@ -26,5 +26,23 @@ public static class SalesEndpoints
                 return Results.Conflict(new { message = ex.Message });
             }
         }).RequireAuthorization(Permissions.SalesCancel);
+
+        // Devolução parcial: devolve ao estoque o que está apto para revenda, lança perda no resto e abate o financeiro.
+        group.MapPost("/{saleId:guid}/devolucao", async (Guid saleId, ReturnSaleRequest request, ISaleService service, CancellationToken ct) =>
+        {
+            try
+            {
+                var result = await service.ReturnItemsAsync(saleId, request, ct);
+                return result is not null ? Results.Ok(result) : Results.NotFound();
+            }
+            catch (ArgumentException ex)
+            {
+                return Results.BadRequest(new { message = ex.Message });
+            }
+            catch (InvalidOperationException ex)
+            {
+                return Results.Conflict(new { message = ex.Message });
+            }
+        }).RequireAuthorization(Permissions.SalesCancel);
     }
 }

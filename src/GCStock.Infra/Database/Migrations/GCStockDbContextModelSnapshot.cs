@@ -1268,6 +1268,98 @@ namespace GCStock.Infra.Database.Migrations
                     b.ToTable("SaleRecords");
                 });
 
+            modelBuilder.Entity("GCStock.Domain.Entities.SaleReturn", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("CashRefundAmount")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<Guid>("CompanyId")
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("CostReturned")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("CreatedBy")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<DateOnly>("Date")
+                        .HasColumnType("date");
+
+                    b.Property<decimal>("NetRevenueReturned")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("ReceiptNumber")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<decimal>("ReceivableAbated")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<decimal>("RefundAmount")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<Guid>("SaleRecordId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("SaleRecordId");
+
+                    b.HasIndex("CompanyId", "Date");
+
+                    b.ToTable("SaleReturns");
+                });
+
+            modelBuilder.Entity("GCStock.Domain.Entities.SaleReturnItem", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<decimal>("Qty")
+                        .HasColumnType("decimal(18,3)");
+
+                    b.Property<decimal>("RefundAmount")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<bool>("Restocked")
+                        .HasColumnType("boolean");
+
+                    b.Property<Guid>("SaleItemId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("SaleReturnId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Unit")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("SaleItemId");
+
+                    b.HasIndex("SaleReturnId");
+
+                    b.ToTable("SaleReturnItems");
+                });
+
             modelBuilder.Entity("GCStock.Domain.Entities.StockBatch", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1712,6 +1804,28 @@ namespace GCStock.Infra.Database.Migrations
                     b.Navigation("Company");
                 });
 
+            modelBuilder.Entity("GCStock.Domain.Entities.SaleReturn", b =>
+                {
+                    b.HasOne("GCStock.Domain.Entities.SaleRecord", "SaleRecord")
+                        .WithMany()
+                        .HasForeignKey("SaleRecordId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("SaleRecord");
+                });
+
+            modelBuilder.Entity("GCStock.Domain.Entities.SaleReturnItem", b =>
+                {
+                    b.HasOne("GCStock.Domain.Entities.SaleReturn", "SaleReturn")
+                        .WithMany("Items")
+                        .HasForeignKey("SaleReturnId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("SaleReturn");
+                });
+
             modelBuilder.Entity("GCStock.Domain.Entities.StockBatch", b =>
                 {
                     b.HasOne("GCStock.Domain.Entities.Company", "Company")
@@ -1779,6 +1893,11 @@ namespace GCStock.Infra.Database.Migrations
                 });
 
             modelBuilder.Entity("GCStock.Domain.Entities.SaleRecord", b =>
+                {
+                    b.Navigation("Items");
+                });
+
+            modelBuilder.Entity("GCStock.Domain.Entities.SaleReturn", b =>
                 {
                     b.Navigation("Items");
                 });

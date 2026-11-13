@@ -91,7 +91,7 @@ public static class Permissions
         new(PurchasesDelete, "Cancelar pedidos de compra", "Cancelar uma entrada de compra lançada por engano (estorna estoque e custo; só se nada dela foi vendido). O histórico é mantido.", "Compras"),
 
         new(SalesCreate, "Realizar vendas", "Finalizar vendas no PDV.", "Vendas (PDV)"),
-        new(SalesCancel, "Cancelar vendas", "Cancelar (estornar) vendas já finalizadas: devolve o estoque e desfaz o título a receber.", "Vendas (PDV)"),
+        new(SalesCancel, "Cancelar vendas", "Cancelar (estornar) vendas já finalizadas e registrar devolução parcial de itens: devolve o estoque apto e ajusta o financeiro.", "Vendas (PDV)"),
         new(SalesEditPrice, "Alterar preço na venda", "Mudar o preço de um item no carrinho do PDV, vendendo por valor diferente do cadastro.", "Vendas (PDV)"),
 
         new(ClientsCreate, "Cadastrar clientes", "Criar novos clientes.", "Clientes"),

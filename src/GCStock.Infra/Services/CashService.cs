@@ -66,6 +66,14 @@ public class CashService(GCStockDbContext db, ICurrentUserContext currentUser, I
         movements.AddRange(refunds.Select(r =>
             new CashMovementDto(r.Date, "devolucao_compra", $"Devolução do fornecedor: {r.SupplierName} (Compra {r.OrderCode})", r.Amount)));
 
+        // Saídas: dinheiro devolvido a clientes (só a parte que já tinha sido recebida; o resto abateu títulos em aberto)
+        var saleReturns = await db.SaleReturns
+            .Where(r => r.CompanyId == companyId && r.CashRefundAmount > 0)
+            .Select(r => new { r.Date, r.ReceiptNumber, r.CashRefundAmount })
+            .ToListAsync(ct);
+        movements.AddRange(saleReturns.Select(r =>
+            new CashMovementDto(r.Date, "devolucao_venda", $"Devolução ao cliente (Venda {r.ReceiptNumber})", -r.CashRefundAmount)));
+
         // Saídas: equipamentos e despesas quando pagos (as compras já saíram acima, na entrada)
         var payables = await db.AccountsPayables.Where(p => p.CompanyId == companyId).ToListAsync(ct);
         movements.AddRange(payables.Where(p => p.Status == "pago" && p.Category != "compras").Select(p =>
@@ -83,6 +91,7 @@ public class CashService(GCStockDbContext db, ICurrentUserContext currentUser, I
         var salesIn = Sum(m => InPeriod(m) && m.Kind == "venda");
         var receivedIn = Sum(m => InPeriod(m) && m.Kind == "recebimento");
         var supplierRefundsIn = Sum(m => InPeriod(m) && m.Kind == "devolucao_compra");
+        var customerRefundsOut = -Sum(m => InPeriod(m) && m.Kind == "devolucao_venda");
         var purchasesOut = -Sum(m => InPeriod(m) && m.Kind == "compra");
         var equipmentOut = -Sum(m => InPeriod(m) && m.Kind == "equipamento");
         var expensesOut = -Sum(m => InPeriod(m) && m.Kind == "despesa");
@@ -102,8 +111,8 @@ public class CashService(GCStockDbContext db, ICurrentUserContext currentUser, I
             from, to,
             openingBalance,
             contributionsIn, salesIn, receivedIn, contributionsIn + salesIn + receivedIn + supplierRefundsIn,
-            purchasesOut, equipmentOut, expensesOut, purchasesOut + equipmentOut + expensesOut,
-            openingBalance + contributionsIn + salesIn + receivedIn + supplierRefundsIn - purchasesOut - equipmentOut - expensesOut,
+            purchasesOut, equipmentOut, expensesOut, purchasesOut + equipmentOut + expensesOut + customerRefundsOut,
+            openingBalance + contributionsIn + salesIn + receivedIn + supplierRefundsIn - purchasesOut - equipmentOut - expensesOut - customerRefundsOut,
             Sum(m => m.Date <= today),
             toReceive,
             open.Sum(p => p.Amount),
