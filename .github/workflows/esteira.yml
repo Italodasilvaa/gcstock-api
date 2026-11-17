@@ -20,7 +20,7 @@ env:
   REGISTRY_URL: registry.iwsolutions.cloud
   API_IMAGE: gcstock-api
   WORKER_IMAGE: gcstock-worker
-  POSTGRES_CONTAINER_FILTER: "^postgres"
+  POSTGRES_CONTAINER_FILTER: '^postgres_postgres.'
   POSTGRES_USER: admin
   BACKUP_DIR: /var/backups/gcstock
   BACKUP_KEEP: "14"
