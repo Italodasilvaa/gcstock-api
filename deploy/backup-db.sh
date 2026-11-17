@@ -4,7 +4,7 @@
 # Se falhar, a publicação para e nada é alterado. Restaurar:
 #   pg_restore --clean --if-exists -U <usuario> -d <banco> <arquivo>.dump
 set -e
-DB="$1"; PGUSER="$2"; BUILD="$3"; FILTER="${4:-^postgres}"; DIR="${5:-/var/backups/gcstock}"; KEEP="${6:-14}"
+DB="$1"; PGUSER="$2"; BUILD="$3"; FILTER="${4:-^postgres_postgres[.]}"; DIR="${5:-/var/backups/gcstock}"; KEEP="${6:-14}"
 
 PG=$(docker ps --filter "name=$FILTER" --format '{{.Names}}' | head -n 1)
 if [ -z "$PG" ]; then echo "Conteiner do Postgres nao encontrado (filtro $FILTER)."; exit 1; fi
