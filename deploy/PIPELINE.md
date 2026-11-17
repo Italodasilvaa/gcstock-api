@@ -1,17 +1,17 @@
 # Esteira de publicação (API e UI)
 
-Duas esteiras no Azure Pipelines, uma em cada repositório, com o mesmo fluxo:
+Duas esteiras no GitHub Actions, uma em cada repositório, com o mesmo fluxo:
 
 | Repositório | Arquivo | Publica | Homologação (nprd) | Produção (prd) |
 |---|---|---|---|---|
-| `gcstock-api` | `azure-pipelines.yml` | API + Worker (imagens `gcstock-api` e `gcstock-worker`) | `api-nprd.iwsolutions.cloud` | `api.iwsolutions.cloud` |
-| `gcstock-ui` | `azure-pipelines.yml` | Front-end (imagem `gcstock-ui`, nginx) | `app-nprd.iwsolutions.cloud` | `app.iwsolutions.cloud` |
+| `gcstock-api` | `.github/workflows/esteira.yml` | API + Worker (imagens `gcstock-api` e `gcstock-worker`) | `api-nprd.iwsolutions.cloud` | `api.iwsolutions.cloud` |
+| `gcstock-ui` | `.github/workflows/esteira.yml` | Front-end (imagem `gcstock-ui`, nginx) | `app-nprd.iwsolutions.cloud` | `app.iwsolutions.cloud` |
 
 ## Fluxo
 
 ```
 feature ──PR──▶ main        valida (não publica)
-main ──merge──▶ stg         valida, gera imagem e publica em HOMOLOGAÇÃO
+main ──merge──▶ stg     valida, gera imagem e publica em HOMOLOGAÇÃO
 stg ──merge──▶ prod        valida, gera imagem e publica em PRODUÇÃO (com aprovação manual)
 ```
 
@@ -43,8 +43,8 @@ stg ──merge──▶ prod        valida, gera imagem e publica em PRODUÇÃO
 O passo de backup roda no servidor, via SSH, antes de cada publicação:
 
 - `pg_dump -Fc` do banco do ambiente (`gcstock_prd` ou `gcstock_nprd`), dentro do contêiner do Postgres.
-- Arquivo em `/var/backups/gcstock/<banco>_<data>_build<id>.dump`. Mantém os 14 mais recentes de cada banco (`BackupKeep` / `BackupPruneFrom` no `azure-pipelines.yml`).
-- Se o contêiner do Postgres não for achado (filtro `^postgres`) ou o backup sair vazio, a publicação **é cancelada**. Ajuste `PostgresContainerFilter` e `PostgresUser` no topo do `azure-pipelines.yml` se o nome do serviço for diferente.
+- Arquivo em `/var/backups/gcstock/<banco>_<data>_build<id>.dump`. Mantém os 14 mais recentes de cada banco (`BackupKeep` / `BackupPruneFrom` no `.github/workflows/esteira.yml`).
+- Se o contêiner do Postgres não for achado (filtro `^postgres`) ou o backup sair vazio, a publicação **é cancelada**. Ajuste `PostgresContainerFilter` e `PostgresUser` no topo do `.github/workflows/esteira.yml` se o nome do serviço for diferente.
 - As migrations do sistema só **adicionam** colunas, tabelas e índices e nunca apagam dados. Mesmo assim o backup existe como ponto de volta.
 
 Restaurar um backup (no servidor):
@@ -63,13 +63,15 @@ docker exec -i "$PG" pg_restore --clean --if-exists -U admin -d gcstock_prd < /v
 
 ## Configuração única (fazer uma vez)
 
-1. **Branches:** crie `stg` e `prod` a partir de `main` nos dois repositórios (`git branch stg main && git push -u origin stg`, idem `prod`).
-2. **Pipeline da UI:** no Azure DevOps, Pipelines > New pipeline > GitHub > `gcstock-ui` > "Existing Azure Pipelines YAML file" > `/azure-pipelines.yml`. (O da API já existe.)
-3. **Service connections** (já usadas pela esteira da API, a UI reaproveita): `registry.iwsolutions.cloud` (Docker Registry) e `swarm-production` / `swarm-staging` (SSH para a VPS).
-4. **Environments** `production` e `staging` (Pipelines > Environments). Em **`production`**, adicione **Approvals and checks > Approvals** com você como aprovador: assim, produção só publica depois do seu OK.
-5. **DNS** (Cloudflare, proxied): `app.iwsolutions.cloud` e `app-nprd.iwsolutions.cloud` apontando para `2.25.255.102` (os de API já existem). O Traefik emite o certificado sozinho (`myresolver`).
-6. **Pasta de backup:** nada a criar (a esteira cria `/var/backups/gcstock`). Se quiser, mova-a para um disco com mais espaço alterando `BackupDir`.
-7. **CORS:** a API já aceita `*.iwsolutions.cloud`, então `app` e `app-nprd` funcionam sem mudança.
+1. **Branches:** `stg` e `prod` já existem nos dois repositórios (a partir de `main`).
+2. **Chave SSH de deploy:** na VPS, crie uma chave só para a esteira e autorize-a:
+   `ssh-keygen -t ed25519 -f ~/gh_deploy -N ""` ; `cat ~/gh_deploy.pub >> ~/.ssh/authorized_keys` ; copie o conteúdo de `~/gh_deploy` (a privada) para o segredo `VPS_SSH_KEY` e depois apague o arquivo da VPS.
+3. **Segredos** (GitHub > repositório > Settings > Secrets and variables > Actions), nos DOIS repositórios:
+   `VPS_HOST` (`2.25.255.102`), `VPS_USER` (o usuário SSH, ex.: root), `VPS_SSH_KEY` (chave privada acima), `REGISTRY_USER` e `REGISTRY_PASSWORD` (login do `registry.iwsolutions.cloud`).
+4. **Environments** `staging` e `production` (Settings > Environments) nos dois repositórios. Em `production`, marque **Required reviewers** e adicione você: produção só publica depois do seu OK. (Em repositório privado no plano gratuito essa opção pode não existir; nesse caso a proteção é só o merge manual `stg` -> `prod`.)
+5. **DNS** (Cloudflare, CNAME para `proxy.iwsolutions.cloud`, com proxy): `app`, `app-nprd`, `api`, `api-nprd`. O Traefik emite o certificado (`myresolver`); no Cloudflare use SSL/TLS "Total".
+6. **Pasta de backup:** a esteira cria `/var/backups/gcstock`. Mude `BACKUP_DIR` no workflow se quiser outro disco.
+7. **CORS:** a API já aceita `*.iwsolutions.cloud`.
 
 ## Publicar à mão (sem esteira)
 
