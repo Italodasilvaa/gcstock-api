@@ -44,13 +44,13 @@ O passo de backup roda no servidor, via SSH, antes de cada publicação:
 
 - `pg_dump -Fc` do banco do ambiente (`gcstock_prd` ou `gcstock_nprd`), dentro do contêiner do Postgres.
 - Arquivo em `/var/backups/gcstock/<banco>_<data>_build<id>.dump`. Mantém os 14 mais recentes de cada banco (`BackupKeep` / `BackupPruneFrom` no `.github/workflows/esteira.yml`).
-- Se o contêiner do Postgres não for achado (filtro `^postgres_postgres.`, o servidor do banco; o serviço `postgres_postgres-backup` é outro e não serve) ou o backup sair vazio, a publicação **é cancelada**. Ajuste `POSTGRES_CONTAINER_FILTER` e `POSTGRES_USER` no topo do `.github/workflows/esteira.yml` se o nome do serviço for diferente.
+- Se o contêiner do Postgres não for achado (filtro `^postgres_postgres[.]`, o servidor do banco; o serviço `postgres_postgres-backup` é outro e não serve) ou o backup sair vazio, a publicação **é cancelada**. Ajuste `POSTGRES_CONTAINER_FILTER` e `POSTGRES_USER` no topo do `.github/workflows/esteira.yml` se o nome do serviço for diferente.
 - As migrations do sistema só **adicionam** colunas, tabelas e índices e nunca apagam dados. Mesmo assim o backup existe como ponto de volta.
 
 Restaurar um backup (no servidor):
 
 ```bash
-PG=$(docker ps --filter "name=^postgres_postgres." --format '{{.Names}}' | head -n 1)
+PG=$(docker ps --filter "name=^postgres_postgres[.]" --format '{{.Names}}' | head -n 1)
 docker exec -i "$PG" pg_restore --clean --if-exists -U admin -d gcstock_prd < /var/backups/gcstock/<arquivo>.dump
 ```
 
