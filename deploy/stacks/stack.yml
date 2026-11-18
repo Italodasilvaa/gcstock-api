@@ -27,8 +27,9 @@ services:
       - public    # Traefik
       - backend   # Postgres (host interno: postgres)
     healthcheck:
-      # A imagem aspnet não tem curl/wget: testa apenas se a porta 8080 aceita conexão.
-      test: ["CMD-SHELL", "exec 3<>/dev/tcp/127.0.0.1/8080"]
+      # A imagem aspnet não tem curl/wget: testa se a porta 8080 aceita conexão. /dev/tcp é recurso do bash
+      # (o /bin/sh da imagem é o dash, que não tem), por isso chama o bash explicitamente.
+      test: ["CMD", "bash", "-c", "exec 3<>/dev/tcp/127.0.0.1/8080"]
       interval: 30s
       timeout: 5s
       retries: 3
