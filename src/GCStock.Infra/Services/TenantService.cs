@@ -56,8 +56,8 @@ public class TenantService(
 
     public async Task<CompanySummaryDto?> UpdateCurrentCompanyAsync(UpdateCompanyRequest request, CancellationToken ct)
     {
-        // Dados cadastrais são do dono: funcionário (mesmo gerente) não altera.
-        if (!currentUser.IsOwner) return null;
+        // Dados cadastrais: o dono ou funcionário com perfil Administrador. Gerente e operador não alteram.
+        if (!currentUser.IsOwner && currentUser.Role != "admin") return null;
 
         var corporateName = request.CorporateName?.Trim() ?? string.Empty;
         var document = request.Document?.Trim() ?? string.Empty;
@@ -68,7 +68,8 @@ public class TenantService(
         if (state.Length != 2) throw new ArgumentException("Informe a UF com 2 letras.");
 
         var company = await db.Companies.FirstOrDefaultAsync(c => c.Id == currentUser.CompanyId, ct);
-        if (company is null || company.OwnerId != currentUser.AdministratorId) return null;
+        // Sempre a empresa do token: um administrador só altera a empresa em que está logado.
+        if (company is null) return null;
 
         company.CorporateName = corporateName;
         company.TradeName = string.IsNullOrWhiteSpace(request.TradeName) ? corporateName : request.TradeName.Trim();

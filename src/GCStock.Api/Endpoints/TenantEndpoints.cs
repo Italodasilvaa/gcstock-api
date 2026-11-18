@@ -17,7 +17,7 @@ public static class TenantEndpoints
             return session is not null ? Results.Ok(session) : Results.BadRequest(new { message = "Troca de empresa não permitida." });
         });
 
-        // Dados cadastrais da empresa ativa: só o dono (validado no serviço).
+        // Dados cadastrais da empresa ativa: dono ou funcionário Administrador (validado no serviço).
         group.MapPut("/current", async (UpdateCompanyRequest request, ITenantService service, CancellationToken ct) =>
         {
             try
@@ -25,7 +25,7 @@ public static class TenantEndpoints
                 var company = await service.UpdateCurrentCompanyAsync(request, ct);
                 return company is not null
                     ? Results.Ok(company)
-                    : Results.Json(new { message = "Só o dono pode alterar os dados da empresa." }, statusCode: StatusCodes.Status403Forbidden);
+                    : Results.Json(new { message = "Só o dono ou um administrador pode alterar os dados da empresa." }, statusCode: StatusCodes.Status403Forbidden);
             }
             catch (ArgumentException ex)
             {

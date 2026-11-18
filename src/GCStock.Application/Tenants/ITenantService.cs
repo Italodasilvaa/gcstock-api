@@ -31,7 +31,7 @@ public interface ITenantService
 
     Task<List<BranchDto>> GetBranchesAsync(CancellationToken ct);
 
-    /// <summary>Altera os dados cadastrais da empresa ativa (só o dono). Retorna null quando quem chama não é o dono.
+    /// <summary>Altera os dados cadastrais da empresa ativa (dono ou funcionário Administrador). Retorna null quando quem chama não tem acesso.
     /// Lança ArgumentException quando um campo obrigatório vem vazio.</summary>
     Task<CompanySummaryDto?> UpdateCurrentCompanyAsync(UpdateCompanyRequest request, CancellationToken ct);
 }
