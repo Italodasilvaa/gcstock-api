@@ -11,6 +11,15 @@ public record BranchDto(
     bool Active,
     string Type);
 
+public record UpdateCompanyRequest(
+    string CorporateName,
+    string? TradeName,
+    string Document,
+    string? Phone,
+    string? Segment,
+    string? City,
+    string? State);
+
 public interface ITenantService
 {
     /// <summary>Empresas do mesmo Administrator (dono) da sessão ativa — usado no seletor de empresas e na transferência de funcionários.</summary>
@@ -21,4 +30,8 @@ public interface ITenantService
     Task<AuthSessionDto?> SwitchCompanyAsync(Guid companyId, CancellationToken ct);
 
     Task<List<BranchDto>> GetBranchesAsync(CancellationToken ct);
+
+    /// <summary>Altera os dados cadastrais da empresa ativa (só o dono). Retorna null quando quem chama não é o dono.
+    /// Lança ArgumentException quando um campo obrigatório vem vazio.</summary>
+    Task<CompanySummaryDto?> UpdateCurrentCompanyAsync(UpdateCompanyRequest request, CancellationToken ct);
 }

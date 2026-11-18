@@ -25,6 +25,7 @@ public class WriteRoutesPermissionTests(WebApplicationFactory<Program> factory)
         "/api/v1/auth/logout",           // qualquer usuário logado
         "/api/v1/auth/renew",            // qualquer usuário logado
         "/api/v1/tenants/switch",        // só o dono (validado no serviço)
+        "/api/v1/tenants/current",       // dados cadastrais da empresa: só o dono (validado no serviço)
         "/api/v1/funcionarios/{id:guid}/transferir", // só o dono (validado no serviço)
         "/api/v1/arquivos",              // upload/remoção de arquivos: qualquer usuário logado (chave isolada por empresa)
         "/api/v1/arquivos/url-upload",
